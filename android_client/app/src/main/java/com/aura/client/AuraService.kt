@@ -139,7 +139,11 @@ class AuraService : Service() {
     private fun sendTelemetry() {
         val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val batteryPct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        val isCharging = bm.isCharging
+        
+        val ifilter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val batteryStatus = registerReceiver(null, ifilter)
+        val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
 
         val telemetryJson = JSONObject().apply {
             put("type", "TELEMETRY")
