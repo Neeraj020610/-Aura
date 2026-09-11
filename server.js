@@ -404,8 +404,11 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     const info = clients.get(ws);
     if (info && info.deviceId && info.deviceId !== 'master_ui') {
-      console.log(`[Aura Hub] Device disconnected: ${info.deviceId}`);
-      delete devices[info.deviceId];
+      console.log(`[Aura Hub] Device disconnected / switched off: ${info.deviceId}`);
+      if (devices[info.deviceId]) {
+        devices[info.deviceId].status = 'offline';
+        devices[info.deviceId].lastSeen = Date.now();
+      }
     }
     clients.delete(ws);
     broadcastDevices();

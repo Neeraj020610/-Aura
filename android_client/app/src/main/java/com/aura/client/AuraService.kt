@@ -99,6 +99,27 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    val isLocked = km?.isKeyguardLocked ?: true
+                    logUi("📱 Screen ON (Locked: $isLocked)")
+                    sendTelemetry()
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    logUi("🌑 Screen OFF (Locked)")
+                    sendTelemetry()
+                }
+                Intent.ACTION_USER_PRESENT -> {
+                    logUi("🔓 Device Unlocked by User")
+                    sendTelemetry()
+                }
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -115,6 +136,13 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
         } else {
             registerReceiver(notificationReceiver, notifFilter)
         }
+
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        registerReceiver(screenReceiver, screenFilter)
 
         handler.post(telemetryRunnable)
     }
@@ -575,13 +603,22 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
                 powerManager.isScreenOn
             }
 
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            val isKeyguardLocked = keyguardManager?.isKeyguardLocked ?: false
+
+            val screenState = when {
+                !isScreenOn -> "OFF"
+                isKeyguardLocked -> "LOCKED"
+                else -> "UNLOCKED"
+            }
+
             val telemetryJson = JSONObject().apply {
                 put("type", "TELEMETRY")
                 put("deviceId", deviceSlot)
-                put("name", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}")
+                put("name", customDeviceName)
                 put("battery", batteryPct)
                 put("isCharging", isCharging)
-                put("screen", if (isScreenOn) "ON" else "OFF")
+                put("screen", screenState)
                 put("accessibilityActive", AuraAccessibilityService.isServiceActive)
                 put("torch", isTorchOn)
             }
@@ -598,6 +635,9 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
         stopAlarmSound()
         try {
             unregisterReceiver(notificationReceiver)
+        } catch (e: Exception) {}
+        try {
+            unregisterReceiver(screenReceiver)
         } catch (e: Exception) {}
         try {
             tts?.stop()

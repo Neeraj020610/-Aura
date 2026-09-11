@@ -536,6 +536,20 @@ body {
   animation: pulse-dot 1.5s infinite alternate;
 }
 
+.status-offline {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  font-weight: 800;
+}
+
+.offline-card {
+  opacity: 0.75;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(76, 5, 25, 0.2)) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
 .no-devices-box {
   grid-column: 1 / -1;
   background: rgba(15, 23, 42, 0.6);

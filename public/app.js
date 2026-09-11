@@ -82,25 +82,38 @@ function initWebSocket() {
   };
 }
 
-// Update Device UI Cards (Dynamically renders only real connected devices)
+// Helper function to format elapsed time for offline devices
+function timeAgo(timestamp) {
+  if (!timestamp) return 'Just now';
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 5) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  return `${diffHr}h ago`;
+}
+
+// Update Device UI Cards (Dynamically renders real connected & recently paired devices)
 function updateDevicesUI(devices) {
   const grid = document.getElementById('dynamicDeviceGrid');
   const countSpan = document.getElementById('fleetCount');
   
   const devEntries = Object.entries(devices);
-  const liveCount = devEntries.length;
+  const totalCount = devEntries.length;
+  const onlineCount = devEntries.filter(([_, d]) => d.status !== 'offline').length;
 
   if (countSpan) {
-    countSpan.textContent = `(${liveCount} Live Device${liveCount === 1 ? '' : 's'})`;
+    countSpan.textContent = `(${onlineCount} Online / ${totalCount} Paired)`;
   }
 
   // If no devices connected, show empty state
-  if (liveCount === 0) {
+  if (totalCount === 0) {
     grid.innerHTML = `
       <div class="no-devices-box">
         <div class="empty-icon">📡</div>
         <h3>No Devices Connected Yet</h3>
-        <p>Open <code>https://83ba789fe18674.lhr.life/phone.html</code> on your phone to pair it wirelessly!</p>
+        <p>Install and open the Aura Client APK on your Android Phone to pair automatically!</p>
       </div>
     `;
     return;
@@ -110,13 +123,35 @@ function updateDevicesUI(devices) {
   let html = '';
   for (const [id, dev] of devEntries) {
     const isMobile = dev.type === 'mobile' || id.startsWith('phone');
+    const isOnline = dev.status !== 'offline';
+    const cardClass = isOnline ? 'device-card real-card' : 'device-card real-card offline-card';
+
     const iconSvg = isMobile
       ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
 
-    const batDisplay = dev.isCharging 
-      ? `<span style="color:#f59e0b; font-weight:800;">⚡ ${dev.battery}% (CHARGING)</span>`
-      : `<span style="color:${dev.battery <= 20 ? '#f43f5e' : '#10b981'}; font-weight:700;">${dev.battery}%</span>`;
+    const statusBadge = isOnline
+      ? `<span class="status-pill status-real-hardware">🟢 LIVE ONLINE</span>`
+      : `<span class="status-pill status-offline">🔴 SWITCHED OFF / OFFLINE (${timeAgo(dev.lastSeen)})</span>`;
+
+    const batDisplay = isOnline
+      ? (dev.isCharging 
+          ? `<span style="color:#f59e0b; font-weight:800;">⚡ ${dev.battery}% (CHARGING)</span>`
+          : `<span style="color:${dev.battery <= 20 ? '#f43f5e' : '#10b981'}; font-weight:700;">${dev.battery}%</span>`)
+      : `<span style="color:#64748b; font-weight:600;">${dev.battery || '--'}% (OFFLINE)</span>`;
+
+    let screenDisplay = '';
+    if (!isOnline) {
+      screenDisplay = `<span style="color:#f43f5e; font-weight:700;">🔴 POWERED OFF</span>`;
+    } else if (dev.screen === 'UNLOCKED') {
+      screenDisplay = `<span style="color:#10b981; font-weight:800;">📱 UNLOCKED (IN USE)</span>`;
+    } else if (dev.screen === 'LOCKED') {
+      screenDisplay = `<span style="color:#f59e0b; font-weight:800;">🔒 LOCKED (SCREEN ON)</span>`;
+    } else if (dev.screen === 'OFF') {
+      screenDisplay = `<span style="color:#94a3b8; font-weight:800;">🌑 SCREEN OFF</span>`;
+    } else {
+      screenDisplay = `<span style="color:#00f3ff; font-weight:700;">${dev.screen || 'ACTIVE'}</span>`;
+    }
 
     const actionsHtml = isMobile 
       ? `
@@ -138,14 +173,14 @@ function updateDevicesUI(devices) {
       `;
 
     html += `
-      <div class="device-card real-card" id="card-${id}" data-device="${id}">
+      <div class="${cardClass}" id="card-${id}" data-device="${id}">
         <div class="device-top">
           <div class="dev-icon ${isMobile ? 'phone-icon' : 'desktop-icon'}">
             ${iconSvg}
           </div>
           <div class="dev-meta">
             <h3>📱 ${dev.name || 'Device'} <span style="font-size:11px; color:#94a3b8;">(${id})</span></h3>
-            <span class="status-pill status-real-hardware">🟢 LIVE CONNECTED</span>
+            ${statusBadge}
           </div>
         </div>
 
@@ -155,12 +190,12 @@ function updateDevicesUI(devices) {
             <span class="stat-val">${batDisplay}</span>
           </div>
           <div class="stat-box">
-            <span class="stat-label">SCREEN</span>
-            <span class="stat-val" style="color: ${dev.screen === 'LOCKED' ? '#f59e0b' : '#00f3ff'}; font-weight:700;">${dev.screen || 'ACTIVE'}</span>
+            <span class="stat-label">SCREEN STATE</span>
+            <span class="stat-val">${screenDisplay}</span>
           </div>
           <div class="stat-box">
             <span class="stat-label">${isMobile ? 'CALL STATE' : 'STATUS'}</span>
-            <span class="stat-val ${dev.callState ? 'text-yellow' : 'text-green'}">${dev.callState ? dev.callState.caller : 'IDLE'}</span>
+            <span class="stat-val ${dev.callState ? 'text-yellow' : 'text-green'}">${dev.callState ? dev.callState.caller : (isOnline ? 'IDLE' : 'STANDBY')}</span>
           </div>
         </div>
 
