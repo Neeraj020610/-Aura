@@ -21,6 +21,8 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
+import androidx.core.app.NotificationCompat
+
 class AuraService : Service() {
 
     private var webSocket: WebSocket? = null
@@ -51,19 +53,12 @@ class AuraService : Service() {
             manager.createNotificationChannel(channel)
         }
 
-        val notification: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, channelId)
-                .setContentTitle("Aura Device Node")
-                .setContentText("Connected to Central Command Hub")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build()
-        } else {
-            Notification.Builder(this)
-                .setContentTitle("Aura Device Node")
-                .setContentText("Connected to Central Command Hub")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .build()
-        }
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("Aura Device Node")
+            .setContentText("Connected to Central Command Hub")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
 
         startForeground(101, notification)
     }
