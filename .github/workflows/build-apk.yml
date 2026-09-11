@@ -22,21 +22,18 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Configure SDK Path & Accept Licenses
-      working-directory: ./android_client
-      run: |
-        echo "sdk.dir=$ANDROID_HOME" > local.properties
-        yes | sdkmanager --licenses || true
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.2'
         cache-disabled: true
 
-    - name: Build APK
+    - name: Generate Wrapper and Build APK
       working-directory: ./android_client
-      run: gradle assembleDebug --no-daemon --stacktrace
+      run: |
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+        gradle wrapper
+        ./gradlew assembleDebug --stacktrace
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
