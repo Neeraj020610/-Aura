@@ -491,11 +491,7 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
                 "AuraClient:ScreenWake"
             )
             screenWakeLock.acquire(3000)
-
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                keyguardManager?.requestDismissKeyguard(null, null)
-            }
+            logUi("Screen awakened")
         } catch (e: Exception) {
             Log.e(TAG, "Wake screen error", e)
         }
