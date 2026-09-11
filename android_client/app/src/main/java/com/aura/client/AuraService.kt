@@ -22,8 +22,6 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-import androidx.core.app.NotificationCompat
-
 class AuraService : Service() {
 
     private var webSocket: WebSocket? = null
@@ -54,11 +52,17 @@ class AuraService : Service() {
             manager.createNotificationChannel(channel)
         }
 
-        val notification = NotificationCompat.Builder(this, channelId)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, channelId)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+
+        val notification = builder
             .setContentTitle("Aura Device Node")
             .setContentText("Connected to Central Command Hub")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
         startForeground(101, notification)
@@ -69,7 +73,6 @@ class AuraService : Service() {
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.d("Aura", "Connected to Aura Hub!")
-                // Register Device
                 val regJson = JSONObject().apply {
                     put("type", "REGISTER")
                     put("deviceId", deviceSlot)
@@ -102,11 +105,10 @@ class AuraService : Service() {
                         startActivity(callIntent)
                     }
                     "LOCK" -> {
-                        // Triggers lock via Accessibility Service
                         AuraAccessibilityService.instance?.lockScreen()
                     }
                     "RING_ALARM" -> {
-                        // Play alarm sound
+                        // Play alarm
                     }
                 }
             }
@@ -117,7 +119,9 @@ class AuraService : Service() {
 
     private fun setupCallListener() {
         val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        @Suppress("DEPRECATION")
         telephonyManager.listen(object : PhoneStateListener() {
+            @Deprecated("Deprecated in Java")
             override fun onCallStateChanged(state: Int, incomingNumber: String?) {
                 if (state == TelephonyManager.CALL_STATE_RINGING) {
                     val alertJson = JSONObject().apply {
@@ -136,7 +140,7 @@ class AuraService : Service() {
         val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val batteryPct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
         
-        val ifilter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         val batteryStatus = registerReceiver(null, ifilter)
         val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL

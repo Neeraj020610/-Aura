@@ -19,13 +19,6 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
-
-    - name: Install Android 34 SDK and Build-Tools
-      run: |
-        yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
@@ -34,9 +27,7 @@ jobs:
 
     - name: Build APK
       working-directory: ./android_client
-      run: |
-        echo "sdk.dir=$ANDROID_HOME" > local.properties
-        gradle assembleDebug --no-daemon --stacktrace
+      run: gradle assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
