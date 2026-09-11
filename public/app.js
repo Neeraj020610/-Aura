@@ -56,6 +56,10 @@ function initWebSocket() {
           handleIncomingCallAlert(msg.data);
           break;
 
+        case 'PHONE_NOTIFICATION_ALERT':
+          handlePhoneNotification(msg.data);
+          break;
+
         case 'COMMAND_CONFIRMED':
           logActivity('cmd', msg.data.message);
           break;
@@ -344,7 +348,120 @@ function acceptCallModal() {
   speakAloud('Call answered on speakerphone, Sir.');
 }
 
-// --- 4. TERMINAL LOG ACTIVITY ---
+// --- 4. PHONE NOTIFICATION & SMS SYNC (WhatsApp, Messages, OTPs) ---
+let notificationCount = 0;
+
+function handlePhoneNotification(data) {
+  notificationCount++;
+  const badge = document.getElementById('notifCountBadge');
+  if (badge) badge.textContent = `${notificationCount} Message${notificationCount === 1 ? '' : 's'} Synced`;
+
+  // Log to terminal
+  logActivity('ok', `📩 [${data.appName}] ${data.title}: ${data.text}`);
+
+  // Play subtle futuristic chime
+  playChimeSound();
+
+  // Show Floating Toast
+  showNotificationToast(data);
+
+  // Add to Live Notifications Feed
+  const streamList = document.getElementById('notifStreamList');
+  if (streamList) {
+    const emptyBox = streamList.querySelector('.empty-notifs');
+    if (emptyBox) emptyBox.remove();
+
+    const timeStr = new Date(data.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const notifEl = document.createElement('div');
+    notifEl.className = 'notif-item';
+    
+    // Choose icon based on app
+    let iconChar = '📩';
+    if (data.appName.toLowerCase().includes('whatsapp')) iconChar = '💬';
+    else if (data.appName.toLowerCase().includes('message') || data.appName.toLowerCase().includes('sms')) iconChar = '✉️';
+    else if (data.appName.toLowerCase().includes('instagram')) iconChar = '📸';
+    else if (data.appName.toLowerCase().includes('mail') || data.appName.toLowerCase().includes('gmail')) iconChar = '📧';
+    else if (data.appName.toLowerCase().includes('bank') || data.text.toLowerCase().includes('otp')) iconChar = '🔑';
+
+    notifEl.innerHTML = `
+      <div class="toast-icon-badge" style="font-size:16px; width:34px; height:34px;">${iconChar}</div>
+      <div class="toast-content">
+        <div class="toast-header">
+          <span class="toast-app-name">${data.appName} <span style="font-size:10px; color:#64748b;">(${data.deviceId || 'phone'})</span></span>
+          <span class="toast-time">${timeStr}</span>
+        </div>
+        <div class="toast-title" style="font-size:13px;">${escapeHtml(data.title)}</div>
+        <div class="toast-body" style="font-size:12px;">${escapeHtml(data.text)}</div>
+      </div>
+    `;
+
+    streamList.insertBefore(notifEl, streamList.firstChild);
+  }
+}
+
+function showNotificationToast(data) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const timeStr = new Date(data.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const toast = document.createElement('div');
+  toast.className = 'notif-toast';
+
+  let iconChar = '📩';
+  if (data.appName.toLowerCase().includes('whatsapp')) iconChar = '💬';
+  else if (data.appName.toLowerCase().includes('message') || data.appName.toLowerCase().includes('sms')) iconChar = '✉️';
+  else if (data.appName.toLowerCase().includes('instagram')) iconChar = '📸';
+  else if (data.appName.toLowerCase().includes('mail') || data.appName.toLowerCase().includes('gmail')) iconChar = '📧';
+  else if (data.appName.toLowerCase().includes('bank') || data.text.toLowerCase().includes('otp')) iconChar = '🔑';
+
+  toast.innerHTML = `
+    <div class="toast-icon-badge">${iconChar}</div>
+    <div class="toast-content">
+      <div class="toast-header">
+        <span class="toast-app-name">${data.appName}</span>
+        <span class="toast-time">${timeStr}</span>
+      </div>
+      <div class="toast-title">${escapeHtml(data.title)}</div>
+      <div class="toast-body">${escapeHtml(data.text)}</div>
+    </div>
+  `;
+
+  container.appendChild(toast);
+
+  // Auto-dismiss after 6 seconds
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => toast.remove(), 300);
+  }, 6000);
+}
+
+function playChimeSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.08); // A5
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (e) {}
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// --- 5. TERMINAL LOG ACTIVITY ---
 function logActivity(type, message) {
   const entry = document.createElement('div');
   const timeStr = new Date().toLocaleTimeString();

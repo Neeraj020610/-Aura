@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AURA // Central Device Command & Voice Hub</title>
+  <title>AURA // Central Multi-Device Command & Notification Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -14,6 +14,9 @@
   <div class="ambient-glow glow-1"></div>
   <div class="ambient-glow glow-2"></div>
   <div class="ambient-glow glow-3"></div>
+
+  <!-- FLOATING NOTIFICATION TOASTS CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <div class="app-container">
     <!-- TOP HEADER -->
@@ -67,10 +70,10 @@
         <!-- SPEECH INTERACTION DISPLAY -->
         <div class="dialogue-box">
           <div class="query-line" id="userSpeechTranscript">
-            <span class="label">YOU:</span> <span class="text" id="userTextDisplay">"Say 'Lock PC' or 'Call Rahul from Phone 1'..."</span>
+            <span class="label">YOU:</span> <span class="text" id="userTextDisplay">"Say 'Lock Phone', 'Torch on', or 'Call Rohan'..."</span>
           </div>
           <div class="response-line" id="assistantSpeechResponse">
-            <span class="label">AURA:</span> <span class="text" id="assistantTextDisplay">"I am listening, Boss. All 4 devices are connected and ready."</span>
+            <span class="label">AURA:</span> <span class="text" id="assistantTextDisplay">"I am listening, Boss. All device channels are synchronized."</span>
           </div>
         </div>
 
@@ -79,11 +82,12 @@
           <span class="chip-label">Quick Commands:</span>
           <div class="chips-list">
             <button class="voice-chip" data-command="Lock PC">🔒 Lock PC</button>
-            <button class="voice-chip" data-command="Call Rohan from Phone 1">📞 Call Rohan (Phone 1)</button>
-            <button class="voice-chip" data-command="Lock Phone 2">📱 Lock Phone 2</button>
-            <button class="voice-chip" data-command="Screen Off Phone 1">🌑 Screen Off Phone 1</button>
-            <button class="voice-chip" data-command="Ring Phone 1">🚨 Find Phone 1</button>
-            <button class="voice-chip" data-command="Battery Status">⚡ Check All Battery</button>
+            <button class="voice-chip" data-command="Call Rahul from Phone 1">📞 Call Rahul (Phone 1)</button>
+            <button class="voice-chip" data-command="Torch on Phone 1">🔦 Flashlight On</button>
+            <button class="voice-chip" data-command="Lock Phone 1">📱 Lock Phone 1</button>
+            <button class="voice-chip" data-command="Ring Phone 1">🚨 Find Phone</button>
+            <button class="voice-chip" data-command="Phone 1 par bolo Command Received">🗣️ Speak on Phone</button>
+            <button class="voice-chip" data-command="Battery Status">⚡ Check Battery</button>
           </div>
         </div>
       </section>
@@ -100,12 +104,26 @@
           <div class="no-devices-box">
             <div class="empty-icon">📡</div>
             <h3>Waiting for Real Devices to Connect...</h3>
-            <p>Open <code>https://83ba789fe18674.lhr.life/phone.html</code> on your phone or run <code>python aura_pc_agent.py</code> on your PC to pair!</p>
+            <p>Open <b>Aura Node</b> on your phone to connect!</p>
           </div>
         </div>
       </section>
 
-      <!-- BOTTOM: REAL-TIME SYSTEM TELEMETRY LOG -->
+      <!-- LIVE PHONE NOTIFICATIONS & SMS STREAM -->
+      <section class="notif-stream-card">
+        <div class="card-header">
+          <div class="badge-tag tag-green">LIVE NOTIFICATIONS</div>
+          <span class="voice-mode" id="notifCountBadge">0 Messages Synced</span>
+        </div>
+        <div class="notif-stream-body" id="notifStreamList">
+          <div class="empty-notifs">
+            <span>📩</span>
+            <p>Incoming WhatsApp, SMS, Bank OTPs, and App notifications will appear here in real time!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- REAL-TIME SYSTEM TELEMETRY LOG -->
       <section class="log-section">
         <div class="log-header">
           <div class="log-title">
@@ -118,7 +136,7 @@
         </div>
         <div class="log-body" id="eventLogContainer">
           <div class="log-entry sys">[SYSTEM] Aura Neural Orchestrator v1.0 initialized.</div>
-          <div class="log-entry ok">[READY] All 4 client channels active on WebSocket.</div>
+          <div class="log-entry ok">[READY] Notification listener and hardware bridges active.</div>
         </div>
       </section>
 
@@ -142,11 +160,11 @@
       <div class="modal-actions">
         <button class="btn-call-decline" onclick="dismissCallModal()">
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></svg>
-          Reject / Cut
+          Dismiss
         </button>
         <button class="btn-call-accept" onclick="acceptCallModal()">
           <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
-          Answer (Speaker)
+          Mute / Silence
         </button>
       </div>
     </div>

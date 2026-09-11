@@ -81,6 +81,23 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private val notificationReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.aura.client.NEW_NOTIFICATION") {
+                val dataStr = intent.getStringExtra("NOTIFICATION_DATA") ?: return
+                try {
+                    val notifJson = JSONObject(dataStr).apply {
+                        put("deviceId", deviceSlot)
+                    }
+                    logUi("📩 Notif Forwarded: [${notifJson.optString("appName")}] ${notifJson.optString("title")}")
+                    webSocket?.send(notifJson.toString())
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error forwarding notification", e)
+                }
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -90,6 +107,14 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
         startForegroundService()
         setupCallListener()
         initTts()
+        
+        val notifFilter = IntentFilter("com.aura.client.NEW_NOTIFICATION")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(notificationReceiver, notifFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(notificationReceiver, notifFilter)
+        }
+
         handler.post(telemetryRunnable)
     }
 
@@ -494,6 +519,9 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
         isServiceRunning = false
         handler.removeCallbacksAndMessages(null)
         stopAlarmSound()
+        try {
+            unregisterReceiver(notificationReceiver)
+        } catch (e: Exception) {}
         try {
             tts?.stop()
             tts?.shutdown()

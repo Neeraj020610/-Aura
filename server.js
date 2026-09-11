@@ -340,6 +340,24 @@ wss.on('connection', (ws, req) => {
           break;
         }
 
+        // Phone Notification Event (WhatsApp, SMS, Telegram, Instagram, Gmail, etc.)
+        case 'PHONE_NOTIFICATION': {
+          const { deviceId, appName, packageName, title, text, timestamp } = data;
+          console.log(`[Aura Hub] 📩 Notification from ${deviceId} [${appName}]: ${title} -> ${text}`);
+          
+          broadcastEvent('PHONE_NOTIFICATION_ALERT', {
+            deviceId,
+            deviceName: devices[deviceId]?.name || deviceId,
+            appName: appName || 'App',
+            packageName: packageName || '',
+            title: title || 'New Notification',
+            text: text || '',
+            timestamp: timestamp || Date.now(),
+            voiceAlert: `Sir, new notification from ${appName}: ${title}, ${text}`
+          });
+          break;
+        }
+
         default:
           break;
       }

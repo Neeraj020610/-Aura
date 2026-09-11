@@ -229,6 +229,23 @@ class MainActivity : Activity() {
         rootLayout.addView(btnAccessibility)
 
         // Spacer
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 10) })
+
+        // Notification Access Button (Crucial for WhatsApp/SMS sync to PC)
+        val btnNotifAccess = Button(this).apply {
+            text = "🔔 ENABLE NOTIFICATION SYNC (WhatsApp & SMS to PC)"
+            setBackgroundColor(Color.parseColor("#134e4a"))
+            setTextColor(Color.parseColor("#2dd4bf"))
+            textSize = 12f
+            setOnClickListener {
+                Toast.makeText(this@MainActivity, "Allow 'Aura Node' in Notification Access", Toast.LENGTH_LONG).show()
+                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                startActivity(intent)
+            }
+        }
+        rootLayout.addView(btnNotifAccess)
+
+        // Spacer
         rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 25) })
 
         // Diagnostic Console
