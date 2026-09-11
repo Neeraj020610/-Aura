@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -18,17 +19,17 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
 
-    - name: Build Debug APK
+    - name: Initialize Gradle Wrapper and Build APK
+      working-directory: ./android_client
       run: |
-        cd android_client
-        chmod +x gradlew || true
-        gradle assembleDebug || ./gradlew assembleDebug
+        gradle wrapper
+        ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: aura-node-app
-        path: android_client/app/build/outputs/apk/debug/app-debug.apk
+        path: android_client/app/build/outputs/apk/debug/*.apk
