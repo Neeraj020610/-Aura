@@ -113,11 +113,14 @@ function updateDevicesUI(devices) {
     const actionsHtml = isMobile 
       ? `
         <button class="cmd-btn btn-primary" onclick="triggerCommand('${id}', 'LOCK')">🔒 Lock</button>
-        <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'UNLOCK')">🔓 Unlock</button>
-        <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'SCREEN_OFF')">🌑 Screen Off</button>
-        <button class="cmd-btn btn-accent" onclick="promptMakeCall('${id}')">📞 Call</button>
+        <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'UNLOCK')">🔓 Wake / Unlock</button>
+        <button class="cmd-btn btn-accent" onclick="promptMakeCall('${id}')">📞 Dial Call</button>
         <button class="cmd-btn btn-danger" onclick="triggerCommand('${id}', 'RING_ALARM')">🚨 Find Phone</button>
-        <button class="cmd-btn btn-warning" onclick="simulateIncomingCall('${id}', '${dev.name}')">📲 Test Alert</button>
+        <button class="cmd-btn btn-warning" onclick="promptSpeakText('${id}')">🗣️ Speak Text</button>
+        <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'TORCH_ON')">🔦 Flashlight On</button>
+        <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'TORCH_OFF')">💡 Flashlight Off</button>
+        <button class="cmd-btn btn-ghost" onclick="triggerCommand('${id}', 'HOME')">🏠 Home</button>
+        <button class="cmd-btn btn-ghost" onclick="triggerCommand('${id}', 'SCREENSHOT')">📸 Screenshot</button>
       `
       : `
         <button class="cmd-btn btn-primary" onclick="triggerCommand('${id}', 'LOCK')">🔒 Lock Screen</button>
@@ -182,9 +185,17 @@ function triggerCommand(targetDevice, action, params = {}) {
 
 // Prompt for Direct Call
 function promptMakeCall(targetDevice) {
-  const contact = prompt(`Enter contact name or number to dial from ${targetDevice}:`, 'Rohan (+91 98765 12345)');
+  const contact = prompt(`Enter contact name or number to dial from ${targetDevice}:`, '9876543210');
   if (contact) {
-    sendVoiceCommandQuery(`Call ${contact} from ${targetDevice}`);
+    triggerCommand(targetDevice, 'CALL', { contact });
+  }
+}
+
+// Prompt for Speech Text to play on phone
+function promptSpeakText(targetDevice) {
+  const text = prompt(`Enter message for ${targetDevice} to speak aloud in Jarvis voice:`, 'Alert: Aura command center connected.');
+  if (text) {
+    triggerCommand(targetDevice, 'SPEAK', { text });
   }
 }
 

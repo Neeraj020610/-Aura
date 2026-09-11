@@ -116,12 +116,48 @@ function parseVoiceCommand(text) {
     if (target === 'all') target = 'phone_1';
     voiceReply = `Ringing loud alarm on ${devices[target]?.name || 'device'} to help you find it.`;
   }
-  // 7. BATTERY STATUS
+  // 7. TORCH / FLASHLIGHT INTENTS
+  else if (q.includes('torch on') || q.includes('flashlight on') || q.includes('torch chalu') || q.includes('flash on')) {
+    action = 'TORCH_ON';
+    if (target === 'all') target = 'phone_1';
+    voiceReply = `Turning on flashlight on ${devices[target]?.name || 'phone'}.`;
+  } else if (q.includes('torch off') || q.includes('flashlight off') || q.includes('torch band') || q.includes('flash off')) {
+    action = 'TORCH_OFF';
+    if (target === 'all') target = 'phone_1';
+    voiceReply = `Turning off flashlight on ${devices[target]?.name || 'phone'}.`;
+  }
+  // 8. SPEAK / TTS THROUGH PHONE
+  else if (q.includes('bolo') || q.includes('speak') || q.includes('say')) {
+    action = 'SPEAK';
+    if (target === 'all') target = 'phone_1';
+    let textToSpeak = q.replace(/(?:bolo|speak|say|on phone|phone 1|phone 2|phone par)/gi, '').trim();
+    if (!textToSpeak) textToSpeak = "Hello from Aura Central Command.";
+    meta.text = textToSpeak;
+    voiceReply = `Speaking on ${devices[target]?.name || 'phone'}: "${textToSpeak}"`;
+  }
+  // 9. SCREENSHOT INTENT
+  else if (q.includes('screenshot') || q.includes('screen shot')) {
+    action = 'SCREENSHOT';
+    if (target === 'all') target = 'phone_1';
+    voiceReply = `Capturing screenshot on ${devices[target]?.name || 'device'}.`;
+  }
+  // 10. NAVIGATION (HOME / BACK / NOTIFICATIONS)
+  else if (q.includes('home')) {
+    action = 'HOME';
+    if (target === 'all') target = 'phone_1';
+    voiceReply = `Going to Home screen on ${devices[target]?.name || 'phone'}.`;
+  } else if (q.includes('back')) {
+    action = 'BACK';
+    if (target === 'all') target = 'phone_1';
+    voiceReply = `Pressing back on ${devices[target]?.name || 'phone'}.`;
+  }
+  // 11. BATTERY STATUS
   else if (q.includes('battery') || q.includes('charge') || q.includes('kitni charge')) {
     action = 'BATTERY_CHECK';
-    voiceReply = `Sir, PC is at ${devices.pc.battery}%, Laptop at ${devices.laptop.battery}%, Phone 1 at ${devices.phone_1.battery}%, and Phone 2 at ${devices.phone_2.battery}%.`;
+    let batDetails = Object.values(devices).map(d => `${d.name}: ${d.battery}%`).join(', ');
+    voiceReply = batDetails ? `Sir, device battery levels are: ${batDetails}.` : `Sir, no devices currently connected.`;
   }
-  // 8. DEFAULT FALLBACK
+  // 12. DEFAULT FALLBACK
   else {
     action = 'GENERAL_QUERY';
     voiceReply = `Understood, Sir. Analyzing command: "${text}". All systems are online and operational.`;

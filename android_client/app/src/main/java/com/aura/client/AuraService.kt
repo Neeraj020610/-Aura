@@ -1,5 +1,6 @@
 package com.aura.client
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,19 +8,15 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.net.wifi.WifiManager
-import android.os.BatteryManager
-import android.os.Build
-import android.os.Handler
-import android.os.IBinder
-import android.os.Looper
-import android.os.PowerManager
-import android.os.VibrationEffect
-import android.os.Vibrator
+import android.os.*
+import android.speech.tts.TextToSpeech
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -29,14 +26,17 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-class AuraService : Service() {
+class AuraService : Service(), TextToSpeech.OnInitListener {
 
     companion object {
         const val TAG = "AuraService"
         const val ACTION_STATUS_UPDATE = "com.aura.client.STATUS_UPDATE"
+        const val ACTION_LOG_UPDATE = "com.aura.client.LOG_UPDATE"
         const val EXTRA_STATUS = "status"
+        const val EXTRA_LOG = "log_message"
         var isConnected = false
         var currentStatusMessage = "Disconnected"
     }
@@ -50,16 +50,23 @@ class AuraService : Service() {
 
     private var deviceSlot = "phone_1"
     private var serverUrl = "ws://10.246.8.197:3000"
+    private var customDeviceName = "Android Phone"
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isServiceRunning = true
+
+    // Hardware controllers
     private var mediaPlayer: MediaPlayer? = null
+    private var originalVolume: Int = -1
+    private var tts: TextToSpeech? = null
+    private var isTtsReady = false
+    private var isTorchOn = false
 
     private val reconnectRunnable = object : Runnable {
         override fun run() {
             if (isServiceRunning && !isConnected) {
-                Log.d(TAG, "Reconnecting WebSocket to $serverUrl ...")
+                logUi("Reconnecting to $serverUrl ...")
                 connectWebSocket()
             }
         }
@@ -82,6 +89,7 @@ class AuraService : Service() {
         acquireLocks()
         startForegroundService()
         setupCallListener()
+        initTts()
         handler.post(telemetryRunnable)
     }
 
@@ -92,8 +100,19 @@ class AuraService : Service() {
         intent?.getStringExtra("DEVICE_SLOT")?.let { 
             if (it.isNotBlank()) deviceSlot = it 
         }
-        
-        Log.d(TAG, "Starting Aura Service with URL: $serverUrl, Slot: $deviceSlot")
+        intent?.getStringExtra("DEVICE_NAME")?.let { 
+            if (it.isNotBlank()) customDeviceName = it 
+        }
+
+        // Save preferences
+        val prefs = getSharedPreferences("AuraPrefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("server_url", serverUrl)
+            .putString("device_slot", deviceSlot)
+            .putString("device_name", customDeviceName)
+            .apply()
+
+        logUi("Aura 24/7 Service Started (Slot: $deviceSlot, Hub: $serverUrl)")
         connectWebSocket()
         return START_STICKY
     }
@@ -151,6 +170,37 @@ class AuraService : Service() {
         sendBroadcast(intent)
     }
 
+    private fun logUi(message: String) {
+        Log.d(TAG, message)
+        val intent = Intent(ACTION_LOG_UPDATE).apply {
+            putExtra(EXTRA_LOG, message)
+            setPackage(packageName)
+        }
+        sendBroadcast(intent)
+    }
+
+    private fun initTts() {
+        try {
+            tts = TextToSpeech(this, this)
+        } catch (e: Exception) {
+            Log.e(TAG, "TTS init error", e)
+        }
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.language = Locale.ENGLISH
+            isTtsReady = true
+            Log.d(TAG, "TTS Initialized successfully")
+        }
+    }
+
+    private fun speak(text: String) {
+        if (isTtsReady && tts != null) {
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "AuraTTS")
+        }
+    }
+
     private fun connectWebSocket() {
         try {
             webSocket?.cancel()
@@ -159,7 +209,7 @@ class AuraService : Service() {
             val request = Request.Builder().url(serverUrl).build()
             webSocket = client.newWebSocket(request, object : WebSocketListener() {
                 override fun onOpen(ws: WebSocket, response: Response) {
-                    Log.d(TAG, "Connected to Aura Hub!")
+                    logUi("🟢 Connected to Aura Master Hub!")
                     updateStatus("Connected to Hub ($deviceSlot)", true)
 
                     val regJson = JSONObject().apply {
@@ -173,23 +223,23 @@ class AuraService : Service() {
                 }
 
                 override fun onMessage(ws: WebSocket, text: String) {
-                    Log.d(TAG, "Received message: $text")
+                    logUi("📩 Received: $text")
                     handleCommand(text)
                 }
 
                 override fun onClosing(ws: WebSocket, code: Int, reason: String) {
-                    Log.w(TAG, "WebSocket closing: $code / $reason")
+                    logUi("⚠️ WebSocket closing: $code / $reason")
                     updateStatus("Disconnected ($reason)", false)
                 }
 
                 override fun onClosed(ws: WebSocket, code: Int, reason: String) {
-                    Log.w(TAG, "WebSocket closed: $code / $reason")
+                    logUi("🔴 WebSocket closed: $code / $reason")
                     updateStatus("Disconnected", false)
                     scheduleReconnect()
                 }
 
                 override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
-                    Log.e(TAG, "WebSocket failure: ${t.message}", t)
+                    logUi("❌ WebSocket failure: ${t.localizedMessage ?: "Unreachable"}")
                     updateStatus("Connection Failed: ${t.localizedMessage ?: "Unreachable"}", false)
                     scheduleReconnect()
                 }
@@ -204,7 +254,7 @@ class AuraService : Service() {
     private fun scheduleReconnect() {
         if (isServiceRunning) {
             handler.removeCallbacks(reconnectRunnable)
-            handler.postDelayed(reconnectRunnable, 2000) // fast 2s retry
+            handler.postDelayed(reconnectRunnable, 2000)
         }
     }
 
@@ -215,17 +265,24 @@ class AuraService : Service() {
                 val action = json.optString("action")
                 val params = json.optJSONObject("params")
 
-                Log.d(TAG, "Executing Action: $action")
+                logUi("⚡ Executing Action: $action")
 
                 when (action) {
                     "CALL" -> {
                         val number = params?.optString("contact") ?: "9876543210"
-                        val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        startActivity(callIntent)
+                        makePhoneCall(number)
                     }
                     "LOCK" -> {
+                        val locked = AuraAccessibilityService.instance?.lockScreen() ?: false
+                        if (!locked) {
+                            // Fallback to screen off
+                            wakeLockOff()
+                        }
+                    }
+                    "UNLOCK", "SCREEN_ON" -> {
+                        wakeScreenOn()
+                    }
+                    "SCREEN_OFF" -> {
                         AuraAccessibilityService.instance?.lockScreen()
                     }
                     "RING_ALARM" -> {
@@ -234,6 +291,31 @@ class AuraService : Service() {
                     "STOP_ALARM" -> {
                         stopAlarmSound()
                     }
+                    "SPEAK", "TTS" -> {
+                        val speechText = params?.optString("text") ?: "Command executed, Sir."
+                        speak(speechText)
+                    }
+                    "TORCH_ON", "FLASHLIGHT_ON" -> {
+                        toggleTorch(true)
+                    }
+                    "TORCH_OFF", "FLASHLIGHT_OFF" -> {
+                        toggleTorch(false)
+                    }
+                    "HOME" -> {
+                        AuraAccessibilityService.instance?.pressHome()
+                    }
+                    "BACK" -> {
+                        AuraAccessibilityService.instance?.pressBack()
+                    }
+                    "NOTIFICATIONS" -> {
+                        AuraAccessibilityService.instance?.openNotifications()
+                    }
+                    "QUICK_SETTINGS" -> {
+                        AuraAccessibilityService.instance?.openQuickSettings()
+                    }
+                    "SCREENSHOT" -> {
+                        AuraAccessibilityService.instance?.takeScreenshot()
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -241,9 +323,65 @@ class AuraService : Service() {
         }
     }
 
+    private fun makePhoneCall(number: String) {
+        try {
+            val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(callIntent)
+            speak("Calling $number")
+        } catch (e: Exception) {
+            logUi("Call failed: ${e.message}")
+        }
+    }
+
+    private fun wakeScreenOn() {
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            @Suppress("DEPRECATION")
+            val screenWakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                "AuraClient:ScreenWake"
+            )
+            screenWakeLock.acquire(3000)
+
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                keyguardManager?.requestDismissKeyguard(null, null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Wake screen error", e)
+        }
+    }
+
+    private fun wakeLockOff() {
+        AuraAccessibilityService.instance?.lockScreen()
+    }
+
+    private fun toggleTorch(enable: Boolean) {
+        try {
+            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            val cameraId = cameraManager?.cameraIdList?.firstOrNull()
+            if (cameraId != null) {
+                cameraManager.setTorchMode(cameraId, enable)
+                isTorchOn = enable
+                logUi("Torch toggled: $enable")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Torch error", e)
+        }
+    }
+
     private fun playAlarmSound() {
         try {
             stopAlarmSound()
+
+            // Maximize alarm volume
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            originalVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+
             val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
@@ -260,18 +398,19 @@ class AuraService : Service() {
                 start()
             }
 
-            // Vibrate
+            // Continuous Vibration
             val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 500, 200, 500), 0))
+                vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 600, 200, 600), 0))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(longArrayOf(0, 500, 200, 500), 0)
+                vibrator?.vibrate(longArrayOf(0, 600, 200, 600), 0)
             }
 
+            // Auto stop after 25 seconds
             handler.postDelayed({
                 stopAlarmSound()
-            }, 20000)
+            }, 25000)
         } catch (e: Exception) {
             Log.e(TAG, "Error playing alarm", e)
         }
@@ -285,6 +424,13 @@ class AuraService : Service() {
 
             val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             vibrator?.cancel()
+
+            // Restore volume if changed
+            if (originalVolume != -1) {
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, originalVolume, 0)
+                originalVolume = -1
+            }
         } catch (e: Exception) {}
     }
 
@@ -319,13 +465,23 @@ class AuraService : Service() {
             val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
             val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
 
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val isScreenOn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                powerManager.isInteractive
+            } else {
+                @Suppress("DEPRECATION")
+                powerManager.isScreenOn
+            }
+
             val telemetryJson = JSONObject().apply {
                 put("type", "TELEMETRY")
                 put("deviceId", deviceSlot)
                 put("name", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}")
                 put("battery", batteryPct)
                 put("isCharging", isCharging)
-                put("screen", "ON")
+                put("screen", if (isScreenOn) "ON" else "OFF")
+                put("accessibilityActive", AuraAccessibilityService.isServiceActive)
+                put("torch", isTorchOn)
             }
             webSocket?.send(telemetryJson.toString())
         } catch (e: Exception) {
@@ -338,6 +494,10 @@ class AuraService : Service() {
         isServiceRunning = false
         handler.removeCallbacksAndMessages(null)
         stopAlarmSound()
+        try {
+            tts?.stop()
+            tts?.shutdown()
+        } catch (e: Exception) {}
         try {
             webSocket?.close(1000, "Service Destroyed")
         } catch (e: Exception) {}
