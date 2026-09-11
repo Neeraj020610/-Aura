@@ -1,6 +1,7 @@
 package com.aura.client
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,8 +10,10 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -32,12 +35,12 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Request runtime permissions
         requestPermissionsIfNeeded()
 
+        val scrollView = ScrollView(this)
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(50, 60, 50, 60)
+            setPadding(50, 50, 50, 50)
             setBackgroundColor(Color.parseColor("#0a0f1d"))
         }
 
@@ -48,19 +51,19 @@ class MainActivity : Activity() {
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#00e5ff"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 20)
         }
         rootLayout.addView(titleText)
 
         // Status Card
         val statusCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(30, 30, 30, 30)
+            setPadding(30, 25, 30, 25)
             setBackgroundColor(Color.parseColor("#151d30"))
         }
 
         val statusLabel = TextView(this).apply {
-            text = "CONNECTION STATUS"
+            text = "LIVE CONNECTION STATUS"
             textSize = 12f
             setTextColor(Color.parseColor("#8892b0"))
         }
@@ -71,20 +74,20 @@ class MainActivity : Activity() {
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(if (AuraService.isConnected) Color.parseColor("#00ff88") else Color.parseColor("#ff5555"))
-            setPadding(0, 10, 0, 0)
+            setPadding(0, 8, 0, 0)
         }
         statusCard.addView(statusTextView)
         rootLayout.addView(statusCard)
 
         // Spacer
-        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 30) })
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 25) })
 
         // Server URL Input Label
         val ipLabel = TextView(this).apply {
             text = "Central Hub WebSocket URL:"
             textSize = 13f
             setTextColor(Color.parseColor("#ccd6f6"))
-            setPadding(0, 10, 0, 10)
+            setPadding(0, 6, 0, 6)
         }
         rootLayout.addView(ipLabel)
 
@@ -94,19 +97,19 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#555f7d"))
             setBackgroundColor(Color.parseColor("#151d30"))
-            setPadding(30, 30, 30, 30)
+            setPadding(25, 25, 25, 25)
         }
         rootLayout.addView(ipInput)
 
         // Spacer
-        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 20) })
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 15) })
 
         // Device Slot Selector
         val slotLabel = TextView(this).apply {
             text = "Device Slot Identity:"
             textSize = 13f
             setTextColor(Color.parseColor("#ccd6f6"))
-            setPadding(0, 10, 0, 10)
+            setPadding(0, 6, 0, 6)
         }
         rootLayout.addView(slotLabel)
 
@@ -120,7 +123,7 @@ class MainActivity : Activity() {
         rootLayout.addView(slotSpinner)
 
         // Spacer
-        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 40) })
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 30) })
 
         // Start Service Button
         val btnStart = Button(this).apply {
@@ -128,7 +131,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.parseColor("#00e5ff"))
             setTextColor(Color.BLACK)
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 30, 0, 30)
+            setPadding(0, 25, 0, 25)
             setOnClickListener {
                 val selectedSlot = if (slotSpinner.selectedItemPosition == 1) "phone_2" else "phone_1"
                 val serviceIntent = Intent(this@MainActivity, AuraService::class.java).apply {
@@ -140,14 +143,14 @@ class MainActivity : Activity() {
                 } else {
                     startService(serviceIntent)
                 }
-                Toast.makeText(this@MainActivity, "Aura Service Started!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, "Aura 24/7 Service Started!", Toast.LENGTH_SHORT).show()
                 updateStatusUi("Connecting to ${ipInput.text}...")
             }
         }
         rootLayout.addView(btnStart)
 
         // Spacer
-        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 20) })
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 15) })
 
         // Stop Service Button
         val btnStop = Button(this).apply {
@@ -164,11 +167,25 @@ class MainActivity : Activity() {
         rootLayout.addView(btnStop)
 
         // Spacer
-        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 30) })
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 25) })
+
+        // Battery Optimization Button (Crucial for 24/7 screen-lock background)
+        val btnBatteryOpt = Button(this).apply {
+            text = "🔋 DISABLE BATTERY RESTRICTIONS (24/7 RUN)"
+            setBackgroundColor(Color.parseColor("#1e3a5f"))
+            setTextColor(Color.parseColor("#60a5fa"))
+            setOnClickListener {
+                requestIgnoreBatteryOptimization()
+            }
+        }
+        rootLayout.addView(btnBatteryOpt)
+
+        // Spacer
+        rootLayout.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 15) })
 
         // Accessibility Permission Button
         val btnAccessibility = Button(this).apply {
-            text = "⚙️ ENABLE SCREEN LOCK PERMISSION"
+            text = "⚙️ ENABLE SCREEN LOCK (Accessibility)"
             setBackgroundColor(Color.parseColor("#3b2d54"))
             setTextColor(Color.parseColor("#e0b0ff"))
             setOnClickListener {
@@ -179,7 +196,23 @@ class MainActivity : Activity() {
         }
         rootLayout.addView(btnAccessibility)
 
-        setContentView(rootLayout)
+        scrollView.addView(rootLayout)
+        setContentView(scrollView)
+    }
+
+    @SuppressLint("BatteryLife")
+    private fun requestIgnoreBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            } else {
+                Toast.makeText(this, "Battery Optimization already Disabled!", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun updateStatusUi(status: String) {

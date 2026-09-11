@@ -11,6 +11,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -44,12 +45,13 @@ class AuraService : Service() {
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(10, TimeUnit.SECONDS)
+        .pingInterval(5, TimeUnit.SECONDS)
         .build()
 
     private var deviceSlot = "phone_1"
     private var serverUrl = "ws://10.246.8.197:3000"
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
     private val handler = Handler(Looper.getMainLooper())
     private var isServiceRunning = true
     private var mediaPlayer: MediaPlayer? = null
@@ -57,7 +59,7 @@ class AuraService : Service() {
     private val reconnectRunnable = object : Runnable {
         override fun run() {
             if (isServiceRunning && !isConnected) {
-                Log.d(TAG, "Attempting WebSocket reconnection to $serverUrl ...")
+                Log.d(TAG, "Reconnecting WebSocket to $serverUrl ...")
                 connectWebSocket()
             }
         }
@@ -68,7 +70,7 @@ class AuraService : Service() {
             if (isServiceRunning && isConnected) {
                 sendTelemetry()
             }
-            handler.postDelayed(this, 5000) // Send telemetry every 5 seconds
+            handler.postDelayed(this, 3000) // Send telemetry every 3 seconds
         }
     }
 
@@ -77,7 +79,7 @@ class AuraService : Service() {
     override fun onCreate() {
         super.onCreate()
         isServiceRunning = true
-        acquireWakeLock()
+        acquireLocks()
         startForegroundService()
         setupCallListener()
         handler.post(telemetryRunnable)
@@ -96,13 +98,21 @@ class AuraService : Service() {
         return START_STICKY
     }
 
-    private fun acquireWakeLock() {
+    private fun acquireLocks() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AuraClient:BackgroundService")
-            wakeLock?.acquire(10 * 60 * 1000L /* 10 minutes, refreshed */)
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AuraClient:WakeLock")
+            wakeLock?.setReferenceCounted(false)
+            wakeLock?.acquire()
+
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            @Suppress("DEPRECATION")
+            wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "AuraClient:WifiLock")
+            wifiLock?.setReferenceCounted(false)
+            wifiLock?.acquire()
+            Log.d(TAG, "WakeLock & WifiLock acquired successfully!")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to acquire WakeLock", e)
+            Log.e(TAG, "Failed to acquire locks", e)
         }
     }
 
@@ -123,8 +133,9 @@ class AuraService : Service() {
 
         val notification = builder
             .setContentTitle("Aura Device Node")
-            .setContentText("Connected to Central Command Hub")
+            .setContentText("24/7 Active Connection to Central Command Hub")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setOngoing(true)
             .build()
 
         startForeground(101, notification)
@@ -151,7 +162,6 @@ class AuraService : Service() {
                     Log.d(TAG, "Connected to Aura Hub!")
                     updateStatus("Connected to Hub ($deviceSlot)", true)
 
-                    // Register this device with the hub
                     val regJson = JSONObject().apply {
                         put("type", "REGISTER")
                         put("deviceId", deviceSlot)
@@ -194,7 +204,7 @@ class AuraService : Service() {
     private fun scheduleReconnect() {
         if (isServiceRunning) {
             handler.removeCallbacks(reconnectRunnable)
-            handler.postDelayed(reconnectRunnable, 4000) // retry after 4 seconds
+            handler.postDelayed(reconnectRunnable, 2000) // fast 2s retry
         }
     }
 
@@ -259,7 +269,6 @@ class AuraService : Service() {
                 vibrator?.vibrate(longArrayOf(0, 500, 200, 500), 0)
             }
 
-            // Auto stop after 20 seconds
             handler.postDelayed({
                 stopAlarmSound()
             }, 20000)
@@ -276,9 +285,7 @@ class AuraService : Service() {
 
             val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             vibrator?.cancel()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping alarm", e)
-        }
+        } catch (e: Exception) {}
     }
 
     private fun setupCallListener() {
@@ -299,9 +306,7 @@ class AuraService : Service() {
                     }
                 }
             }, PhoneStateListener.LISTEN_CALL_STATE)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error setting up call listener", e)
-        }
+        } catch (e: Exception) {}
     }
 
     private fun sendTelemetry() {
@@ -338,6 +343,9 @@ class AuraService : Service() {
         } catch (e: Exception) {}
         try {
             if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (e: Exception) {}
+        try {
+            if (wifiLock?.isHeld == true) wifiLock?.release()
         } catch (e: Exception) {}
         updateStatus("Service Stopped", false)
     }

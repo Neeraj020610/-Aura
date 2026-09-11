@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AURA // Phone Client Node</title>
+  <title>AURA // Phone Client Node (24/7 Background)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -40,7 +40,7 @@
       box-shadow: 0 10px 40px rgba(0,0,0,0.7);
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 18px;
     }
     .node-status-orb {
       width: 80px;
@@ -54,21 +54,29 @@
       justify-content: center;
       box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
       animation: pulse 2s infinite ease-in-out;
+      transition: all 0.3s;
+    }
+    .node-status-orb.disconnected {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: var(--danger);
+      box-shadow: 0 0 25px rgba(244, 63, 94, 0.4);
+      animation: none;
     }
     @keyframes pulse {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.08); }
     }
     .node-status-orb svg { width: 36px; height: 36px; color: var(--green); }
+    .node-status-orb.disconnected svg { color: var(--danger); }
     h1 { font-size: 22px; font-weight: 800; }
     h1 span { color: var(--cyan); }
     .device-select-group {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       text-align: left;
     }
-    label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+    label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
     select, input {
       background: rgba(0,0,0,0.5);
       border: 1px solid rgba(255,255,255,0.1);
@@ -84,22 +92,44 @@
       background: var(--cyan);
       color: #000;
       border: none;
-      padding: 14px;
+      padding: 15px;
       border-radius: 14px;
       font-weight: 800;
       font-size: 15px;
       cursor: pointer;
-      transition: transform 0.2s;
+      transition: all 0.2s;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
     }
     .btn-connect:active { transform: scale(0.98); }
     .status-badge {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 700;
       color: var(--green);
       background: rgba(16, 185, 129, 0.1);
-      padding: 6px 12px;
+      padding: 8px 12px;
       border-radius: 8px;
       border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .telemetry-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .telemetry-pill {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .telemetry-pill span {
+      display: block;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-top: 4px;
     }
     .alarm-box {
       display: none;
@@ -114,21 +144,47 @@
       0% { opacity: 0.8; }
       100% { opacity: 1; transform: scale(1.02); }
     }
+    .bg-tip {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.4;
+      background: rgba(0, 243, 255, 0.05);
+      border: 1px dashed rgba(0, 243, 255, 0.2);
+      padding: 10px;
+      border-radius: 10px;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
 
+  <!-- Hidden background audio keep-alive -->
+  <audio id="silentAudio" loop playsinline preload="auto">
+    <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA" type="audio/wav">
+  </audio>
+
   <div class="node-card">
-    <div class="node-status-orb" id="statusOrb">
+    <div class="node-status-orb disconnected" id="statusOrb">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
     </div>
 
     <div>
-      <h1>AURA <span>CLIENT NODE</span></h1>
-      <p style="font-size: 12px; color: var(--muted); margin-top: 4px;">Phone Background Agent Bridge</p>
+      <h1>AURA <span>PHONE NODE</span></h1>
+      <p style="font-size: 12px; color: var(--muted); margin-top: 4px;">24/7 High-Reliability Device Node</p>
     </div>
 
-    <div class="status-badge" id="connStatus">DISCONNECTED</div>
+    <div class="status-badge" id="connStatus" style="color: var(--danger);">DISCONNECTED</div>
+
+    <div class="telemetry-row">
+      <div class="telemetry-pill">
+        BATTERY
+        <span id="telBattery">--%</span>
+      </div>
+      <div class="telemetry-pill">
+        CHARGING
+        <span id="telCharging">--</span>
+      </div>
+    </div>
 
     <div class="device-select-group">
       <label>Pair this Phone as:</label>
@@ -139,11 +195,15 @@
     </div>
 
     <div class="device-select-group">
-      <label>Custom Phone Name:</label>
-      <input type="text" id="phoneCustomName" value="My Android Device">
+      <label>Device Display Name:</label>
+      <input type="text" id="phoneCustomName" value="Neeraj Phone">
     </div>
 
-    <button class="btn-connect" id="btnToggleConnect" onclick="togglePhoneConnection()">PAIR & CONNECT PHONE</button>
+    <button class="btn-connect" id="btnToggleConnect" onclick="togglePhoneConnection()">PAIR & CONNECT 24/7</button>
+
+    <div class="bg-tip">
+      💡 <b>Screen Lock Keep-Alive:</b> Pairing keeps a background media session active so the phone stays connected even when you turn off or lock the screen!
+    </div>
 
     <div class="alarm-box" id="alarmBox">
       🚨 FIND MY PHONE // ALARM RINGING!
@@ -154,61 +214,100 @@
     let ws = null;
     let isConnected = false;
     let telemetryTimer = null;
+    let reconnectTimer = null;
     let audioCtx = null;
+    let batteryManager = null;
+    let shouldStayConnected = false;
 
     const connStatus = document.getElementById('connStatus');
+    const statusOrb = document.getElementById('statusOrb');
     const btnToggleConnect = document.getElementById('btnToggleConnect');
     const deviceSlotSelect = document.getElementById('deviceSlotSelect');
     const phoneCustomName = document.getElementById('phoneCustomName');
     const alarmBox = document.getElementById('alarmBox');
+    const telBattery = document.getElementById('telBattery');
+    const telCharging = document.getElementById('telCharging');
+    const silentAudio = document.getElementById('silentAudio');
+
+    // Background keep-alive using silent audio
+    function enableBackgroundKeepAlive() {
+      try {
+        silentAudio.play().then(() => {
+          console.log('[Aura] Background audio keep-alive active');
+        }).catch(e => console.log('Audio autoplay policy:', e));
+      } catch (err) {}
+    }
 
     function playLoudAlarm() {
       alarmBox.style.display = 'block';
       
-      // Vibrate phone if supported
+      // Vibrate phone continuous
       if ('vibrate' in navigator) {
-        navigator.vibrate([500, 250, 500, 250, 500, 250, 500]);
+        navigator.vibrate([600, 200, 600, 200, 600, 200, 800]);
       }
 
-      // Play beep sound via Web Audio
+      // Play high volume alarm tone
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        
+        let freq = 800;
+        let toggle = true;
+        const interval = setInterval(() => {
+          freq = toggle ? 1200 : 700;
+          toggle = !toggle;
+          if (osc && audioCtx) {
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          }
+        }, 300);
+
         gain.gain.setValueAtTime(1.0, audioCtx.currentTime);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
+
         setTimeout(() => {
-          osc.stop();
+          clearInterval(interval);
+          try { osc.stop(); } catch(e){}
           alarmBox.style.display = 'none';
-        }, 4000);
+        }, 8000);
       } catch (e) {
-        console.error(e);
+        console.error('Alarm sound error:', e);
       }
     }
-
-    let batteryManager = null;
 
     async function initBatteryMonitoring() {
       if ('getBattery' in navigator) {
         try {
           batteryManager = await navigator.getBattery();
           
-          // Immediate update on charging plug/unplug
+          updateBatteryUI();
+
           batteryManager.addEventListener('chargingchange', () => {
-            console.log('Charging changed:', batteryManager.charging);
+            updateBatteryUI();
             sendTelemetry();
           });
           
           batteryManager.addEventListener('levelchange', () => {
+            updateBatteryUI();
             sendTelemetry();
           });
         } catch (e) {
           console.warn('Battery API error:', e);
         }
+      }
+    }
+
+    function updateBatteryUI() {
+      if (batteryManager) {
+        const pct = Math.round(batteryManager.level * 100);
+        telBattery.textContent = pct + '%';
+        telCharging.textContent = batteryManager.charging ? '⚡ YES' : 'NO';
+        telCharging.style.color = batteryManager.charging ? '#10b981' : '#94a3b8';
       }
     }
 
@@ -228,12 +327,15 @@
           };
         } catch (e) {}
       }
-      return { battery: 20, isCharging: false };
+      return { battery: 85, isCharging: false };
     }
 
     async function sendTelemetry() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       const bInfo = await getBatteryInfo();
+      
+      updateBatteryUI();
+
       ws.send(JSON.stringify({
         type: 'TELEMETRY',
         deviceId: deviceSlotSelect.value,
@@ -250,97 +352,138 @@
       try {
         if ('wakeLock' in navigator) {
           wakeLock = await navigator.wakeLock.request('screen');
-          console.log('Screen WakeLock active!');
         }
-      } catch (err) {
-        console.warn('WakeLock error:', err);
-      }
+      } catch (err) {}
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       initBatteryMonitoring();
       requestWakeLock();
       
-      // Auto re-request wakelock and reconnect when tab becomes visible again
+      // Auto-reconnect instantly when phone wakes up or network recovers
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           requestWakeLock();
-          if (!isConnected) togglePhoneConnection();
+          enableBackgroundKeepAlive();
+          if (shouldStayConnected && (!ws || ws.readyState !== WebSocket.OPEN)) {
+            connectWebSocket();
+          } else if (ws && ws.readyState === WebSocket.OPEN) {
+            sendTelemetry();
+          }
         }
+      });
+
+      window.addEventListener('online', () => {
+        if (shouldStayConnected) connectWebSocket();
       });
     });
 
     function togglePhoneConnection() {
       if (isConnected) {
+        shouldStayConnected = false;
+        clearTimeout(reconnectTimer);
+        clearInterval(telemetryTimer);
         if (ws) ws.close();
+        silentAudio.pause();
         return;
       }
+
+      shouldStayConnected = true;
+      enableBackgroundKeepAlive();
+      connectWebSocket();
+    }
+
+    function connectWebSocket() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
+      clearTimeout(reconnectTimer);
       initBatteryMonitoring();
+
+      connStatus.textContent = 'CONNECTING...';
+      connStatus.style.color = '#f59e0b';
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}`;
 
-      ws = new WebSocket(wsUrl);
+      try {
+        ws = new WebSocket(wsUrl);
 
-      ws.onopen = () => {
-        isConnected = true;
-        connStatus.textContent = 'CONNECTED & PAIRED';
-        connStatus.style.color = '#10b981';
-        btnToggleConnect.textContent = 'DISCONNECT';
-        btnToggleConnect.style.background = '#f43f5e';
-        btnToggleConnect.style.color = '#fff';
+        ws.onopen = () => {
+          isConnected = true;
+          statusOrb.classList.remove('disconnected');
+          connStatus.textContent = 'CONNECTED & 24/7 ACTIVE';
+          connStatus.style.color = '#10b981';
+          btnToggleConnect.textContent = 'DISCONNECT';
+          btnToggleConnect.style.background = '#f43f5e';
+          btnToggleConnect.style.color = '#fff';
 
-        // Register phone
-        ws.send(JSON.stringify({
-          type: 'REGISTER',
-          deviceId: deviceSlotSelect.value,
-          name: phoneCustomName.value || 'Android Phone',
-          deviceType: 'mobile'
-        }));
+          // Register phone slot
+          ws.send(JSON.stringify({
+            type: 'REGISTER',
+            deviceId: deviceSlotSelect.value,
+            name: phoneCustomName.value || 'Android Phone',
+            deviceType: 'mobile'
+          }));
 
-        sendTelemetry();
-        telemetryTimer = setInterval(sendTelemetry, 5000);
-      };
+          sendTelemetry();
+          clearInterval(telemetryTimer);
+          telemetryTimer = setInterval(sendTelemetry, 3000); // Send heartbeat every 3s
+        };
 
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          console.log('[PHONE CLIENT] Received Command:', data);
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'COMMAND') {
+              const action = data.action;
 
-          if (data.type === 'COMMAND') {
-            const action = data.action;
-
-            if (action === 'RING_ALARM') {
-              playLoudAlarm();
-            } 
-            else if (action === 'LOCK') {
-              showLockScreenOverlay();
-            } 
-            else if (action === 'SCREEN_OFF') {
-              showScreenOffOverlay();
-            } 
-            else if (action === 'UNLOCK') {
-              hideOverlays();
-            } 
-            else if (action === 'CALL') {
-              const num = data.params?.contact || '9876543210';
-              window.location.href = `tel:${encodeURIComponent(num)}`;
+              if (action === 'RING_ALARM') {
+                playLoudAlarm();
+              } 
+              else if (action === 'LOCK') {
+                showLockScreenOverlay();
+              } 
+              else if (action === 'SCREEN_OFF') {
+                showScreenOffOverlay();
+              } 
+              else if (action === 'UNLOCK') {
+                hideOverlays();
+              } 
+              else if (action === 'CALL') {
+                const num = data.params?.contact || '9876543210';
+                window.location.href = `tel:${encodeURIComponent(num)}`;
+              }
             }
+          } catch (err) {
+            console.error('Error handling command:', err);
           }
-        } catch (err) {
-          console.error('Error in phone onmessage:', err);
-        }
-      };
+        };
 
-      ws.onclose = () => {
-        isConnected = false;
-        clearInterval(telemetryTimer);
-        connStatus.textContent = 'DISCONNECTED';
-        connStatus.style.color = '#f43f5e';
-        btnToggleConnect.textContent = 'PAIR & CONNECT PHONE';
-        btnToggleConnect.style.background = '#00f3ff';
-        btnToggleConnect.style.color = '#000';
-      };
+        ws.onclose = () => {
+          isConnected = false;
+          statusOrb.classList.add('disconnected');
+          clearInterval(telemetryTimer);
+          connStatus.textContent = 'DISCONNECTED (AUTO-RECONNECTING)';
+          connStatus.style.color = '#f43f5e';
+          btnToggleConnect.textContent = 'RECONNECTING...';
+          btnToggleConnect.style.background = '#f59e0b';
+          btnToggleConnect.style.color = '#000';
+
+          if (shouldStayConnected) {
+            reconnectTimer = setTimeout(connectWebSocket, 2000); // Instant 2s reconnect
+          }
+        };
+
+        ws.onerror = () => {
+          try { ws.close(); } catch(e){}
+        };
+
+      } catch (err) {
+        if (shouldStayConnected) {
+          reconnectTimer = setTimeout(connectWebSocket, 3000);
+        }
+      }
     }
 
     // Overlays for Lock and Screen Off
@@ -354,12 +497,12 @@
           <div style="font-size:70px;margin-bottom:20px;">🔒</div>
           <h1 style="font-size:28px;color:#fff;margin-bottom:10px;">PHONE LOCKED</h1>
           <p style="color:#94a3b8;font-size:14px;">Locked remotely by Aura Master Hub</p>
-          <button onclick="hideOverlays()" style="margin-top:40px;background:#10b981;color:#000;border:none;padding:12px 28px;border-radius:12px;font-weight:800;font-size:16px;">TAP TO UNLOCK</button>
+          <button onclick="hideOverlays()" style="margin-top:40px;background:#10b981;color:#000;border:none;padding:14px 32px;border-radius:14px;font-weight:800;font-size:16px;">TAP TO UNLOCK</button>
         `;
         document.body.appendChild(lockDiv);
       }
       lockDiv.style.display = 'flex';
-      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+      if ('vibrate' in navigator) navigator.vibrate([300, 100, 300]);
     }
 
     function showScreenOffOverlay() {
@@ -367,9 +510,10 @@
       if (!offDiv) {
         offDiv = document.createElement('div');
         offDiv.id = 'phoneScreenOffOverlay';
-        offDiv.style.cssText = 'position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:99999;';
+        offDiv.style.cssText = 'position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;';
         offDiv.innerHTML = `
-          <p style="color:#334155;font-size:12px;cursor:pointer;" onclick="hideOverlays()">Screen Off (Tap to wake)</p>
+          <div style="width:10px;height:10px;border-radius:50%;background:#00f3ff;opacity:0.3;margin-bottom:20px;"></div>
+          <p style="color:#334155;font-size:13px;cursor:pointer;user-select:none;" onclick="hideOverlays()">Screen Off (Tap to wake)</p>
         `;
         document.body.appendChild(offDiv);
       }
@@ -381,7 +525,7 @@
       if (lockDiv) lockDiv.style.display = 'none';
       const offDiv = document.getElementById('phoneScreenOffOverlay');
       if (offDiv) offDiv.style.display = 'none';
-      if ('vibrate' in navigator) navigator.vibrate(100);
+      if ('vibrate' in navigator) navigator.vibrate(80);
     }
   </script>
 </body>
