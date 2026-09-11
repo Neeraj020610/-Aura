@@ -10,6 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.camera2.CameraManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -266,10 +269,11 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
                     logUi("🟢 Connected to Aura Master Hub!")
                     updateStatus("Connected to Hub ($deviceSlot)", true)
 
+                    val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
                     val regJson = JSONObject().apply {
                         put("type", "REGISTER")
                         put("deviceId", deviceSlot)
-                        put("name", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}")
+                        put("name", deviceName)
                         put("deviceType", "mobile")
                     }
                     ws.send(regJson.toString())
@@ -383,34 +387,34 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
     @SuppressLint("MissingPermission")
     private fun fetchAndSendLocation() {
         try {
-            val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             if (locationManager == null) {
                 logUi("LocationManager not available")
                 return
             }
 
-            var bestLocation: android.location.Location? = null
+            var bestLocation: Location? = null
 
             // Check GPS Provider
             try {
-                if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
-                    val loc = locationManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    val loc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                     if (loc != null) bestLocation = loc
                 }
             } catch (e: Exception) {}
 
             // Check Network Provider if GPS not available
             try {
-                if (bestLocation == null && locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
-                    val loc = locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                if (bestLocation == null && locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    val loc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                     if (loc != null) bestLocation = loc
                 }
             } catch (e: Exception) {}
 
             // Check Passive Provider
             try {
-                if (bestLocation == null && locationManager.isProviderEnabled(android.location.LocationManager.PASSIVE_PROVIDER)) {
-                    val loc = locationManager.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER)
+                if (bestLocation == null && locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+                    val loc = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
                     if (loc != null) bestLocation = loc
                 }
             } catch (e: Exception) {}
@@ -429,10 +433,8 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
                 webSocket?.send(locJson.toString())
             } else {
                 logUi("⚠️ Requesting fresh GPS coordinates...")
-                // Request a single fresh location update on main looper
-                locationManager.requestSingleUpdate(
-                    android.location.LocationManager.NETWORK_PROVIDER,
-                    { location ->
+                val locationListener = object : LocationListener {
+                    override fun onLocationChanged(location: Location) {
                         val locJson = JSONObject().apply {
                             put("type", "DEVICE_LOCATION")
                             put("deviceId", deviceSlot)
@@ -444,9 +446,24 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
                         }
                         logUi("📍 GPS Location Acquired: ${location.latitude}, ${location.longitude}")
                         webSocket?.send(locJson.toString())
-                    },
-                    Looper.getMainLooper()
-                )
+                        try {
+                            locationManager.removeUpdates(this)
+                        } catch (e: Exception) {}
+                    }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+                    override fun onProviderEnabled(provider: String) {}
+                    override fun onProviderDisabled(provider: String) {}
+                }
+
+                val provider = if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    LocationManager.GPS_PROVIDER
+                } else {
+                    LocationManager.NETWORK_PROVIDER
+                }
+
+                locationManager.requestSingleUpdate(provider, locationListener, Looper.getMainLooper())
             }
         } catch (e: Exception) {
             logUi("Error fetching location: ${e.message}")

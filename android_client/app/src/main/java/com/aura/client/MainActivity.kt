@@ -251,7 +251,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("AuraPrefs", Context.MODE_PRIVATE)
         val serverUrl = prefs.getString("server_url", "ws://10.246.8.197:3000") ?: "ws://10.246.8.197:3000"
         val deviceSlot = prefs.getString("device_slot", "phone_1") ?: "phone_1"
-        val customName = prefs.getString("device_name", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}") ?: "My Phone"
+        val customName = prefs.getString("device_name", "${Build.MANUFACTURER} ${Build.MODEL}".trim()) ?: "My Phone"
 
         val serviceIntent = Intent(this, AuraService::class.java).apply {
             putExtra("SERVER_URL", serverUrl)
@@ -270,7 +270,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("AuraPrefs", Context.MODE_PRIVATE)
         val savedUrl = prefs.getString("server_url", "ws://10.246.8.197:3000") ?: "ws://10.246.8.197:3000"
         val savedSlot = prefs.getString("device_slot", "phone_1") ?: "phone_1"
-        val savedName = prefs.getString("device_name", "${Build.MANUFACTURER.capitalize()} ${Build.MODEL}") ?: "My Android Device"
+        val savedName = prefs.getString("device_name", "${Build.MANUFACTURER} ${Build.MODEL}".trim()) ?: "My Android Device"
 
         val scrollView = ScrollView(this)
         val dialogLayout = LinearLayout(this).apply {

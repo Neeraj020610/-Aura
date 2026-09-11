@@ -32,11 +32,11 @@ class AuraNotificationListener : NotificationListenerService() {
         if (sbn == null) return
 
         try {
-            val packageName = sbn.packageName ?: return
+            val pkg = sbn.packageName ?: return
 
             // Ignore system notifications and our own app's foreground notification
-            if (packageName == packageName && sbn.id == 101) return
-            if (packageName == "android" || packageName.contains("systemui", ignoreCase = true)) return
+            if (pkg == this.packageName && sbn.id == 101) return
+            if (pkg == "android" || pkg.contains("systemui", ignoreCase = true)) return
 
             val extras: Bundle? = sbn.notification?.extras
             val title = extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -50,10 +50,10 @@ class AuraNotificationListener : NotificationListenerService() {
             // Get app friendly name
             val pm = packageManager
             val appName = try {
-                val appInfo = pm.getApplicationInfo(packageName, 0)
+                val appInfo = pm.getApplicationInfo(pkg, 0)
                 pm.getApplicationLabel(appInfo).toString()
             } catch (e: Exception) {
-                packageName
+                pkg
             }
 
             Log.d(TAG, "Notification Received: [$appName] $title -> $messageContent")
@@ -62,7 +62,7 @@ class AuraNotificationListener : NotificationListenerService() {
             val notifJson = JSONObject().apply {
                 put("type", "PHONE_NOTIFICATION")
                 put("appName", appName)
-                put("packageName", packageName)
+                put("packageName", pkg)
                 put("title", title)
                 put("text", messageContent)
                 put("timestamp", sbn.postTime)
@@ -71,7 +71,7 @@ class AuraNotificationListener : NotificationListenerService() {
             // Broadcast to AuraService
             val intent = Intent("com.aura.client.NEW_NOTIFICATION").apply {
                 putExtra("NOTIFICATION_DATA", notifJson.toString())
-                setPackage(packageName)
+                setPackage(this@AuraNotificationListener.packageName)
             }
             sendBroadcast(intent)
 

@@ -1,14 +1,18 @@
 package com.aura.client
 
 import android.content.Context
-import android.graphics.*
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Point
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.AttributeSet
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import java.util.Random
@@ -43,6 +47,9 @@ class SnakeGameView @JvmOverloads constructor(
     private val handler = Handler(Looper.getMainLooper())
     private var gameSpeed = 160L // ms per frame
 
+    private var touchStartX = 0f
+    private var touchStartY = 0f
+
     // Paint objects
     private val bgPaint = Paint().apply { color = Color.parseColor("#050811") }
     private val gridPaint = Paint().apply {
@@ -75,34 +82,6 @@ class SnakeGameView @JvmOverloads constructor(
 
     var onScoreChangeListener: ((score: Int, highScore: Int) -> Unit)? = null
     var onGameStateChangeListener: ((state: GameState) -> Unit)? = null
-
-    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onFling(
-            e1: MotionEvent?,
-            e2: MotionEvent,
-            velocityX: Float,
-            velocityY: Float
-        ): Boolean {
-            if (e1 == null) return false
-            val diffX = e2.x - e1.x
-            val diffY = e2.y - e1.y
-
-            if (abs(diffX) > abs(diffY)) {
-                if (abs(diffX) > 50) {
-                    if (diffX > 0) setMoveDirection(Direction.RIGHT)
-                    else setMoveDirection(Direction.LEFT)
-                }
-            } else {
-                if (abs(diffY) > 50) {
-                    if (diffY > 0) setMoveDirection(Direction.DOWN)
-                    else setMoveDirection(Direction.UP)
-                }
-            }
-            return true
-        }
-
-        override fun onDown(e: MotionEvent): Boolean = true
-    })
 
     private val gameLoopRunnable = object : Runnable {
         override fun run() {
@@ -254,7 +233,7 @@ class SnakeGameView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        val size = w.coerceAtMost(h)
+        val size = if (w < h) w else h
         cellWidth = size.toFloat() / gridSize
         cellHeight = size.toFloat() / gridSize
     }
@@ -262,7 +241,7 @@ class SnakeGameView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val size = width.coerceAtMost(height).toFloat()
+        val size = (if (width < height) width else height).toFloat()
         val offsetX = (width - size) / 2f
         val offsetY = (height - size) / 2f
 
@@ -313,12 +292,32 @@ class SnakeGameView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        gestureDetector.onTouchEvent(event)
-        if (event.action == MotionEvent.ACTION_UP) {
-            if (gameState == GameState.READY || gameState == GameState.GAME_OVER) {
-                startGame()
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                touchStartX = event.x
+                touchStartY = event.y
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val diffX = event.x - touchStartX
+                val diffY = event.y - touchStartY
+
+                if (abs(diffX) > 40 || abs(diffY) > 40) {
+                    if (abs(diffX) > abs(diffY)) {
+                        if (diffX > 0) setMoveDirection(Direction.RIGHT)
+                        else setMoveDirection(Direction.LEFT)
+                    } else {
+                        if (diffY > 0) setMoveDirection(Direction.DOWN)
+                        else setMoveDirection(Direction.UP)
+                    }
+                } else {
+                    if (gameState == GameState.READY || gameState == GameState.GAME_OVER) {
+                        startGame()
+                    }
+                }
+                return true
             }
         }
-        return true
+        return super.onTouchEvent(event)
     }
 }

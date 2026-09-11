@@ -7,7 +7,8 @@ import android.os.Build
 import android.util.Log
 
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (context == null || intent == null) return
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
             Log.d("AuraBootReceiver", "Boot completed detected, auto-starting Aura Service...")
             val prefs = context.getSharedPreferences("AuraPrefs", Context.MODE_PRIVATE)
