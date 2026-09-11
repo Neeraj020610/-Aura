@@ -1030,6 +1030,62 @@ body {
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* LOCATION MODAL STYLES */
+.location-modal-card {
+  width: 480px;
+  max-width: 90vw;
+  padding: 28px;
+}
+
+.location-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 18px;
+}
+
+.loc-pin-orb {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.loc-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.loc-stat-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.map-embed-wrapper {
+  width: 100%;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
 /* RESPONSIVE DESIGN */
 @media (max-width: 1024px) {
   .dashboard-grid {

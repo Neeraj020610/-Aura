@@ -60,6 +60,10 @@ function initWebSocket() {
           handlePhoneNotification(msg.data);
           break;
 
+        case 'DEVICE_LOCATION_UPDATE':
+          handleDeviceLocation(msg.data);
+          break;
+
         case 'COMMAND_CONFIRMED':
           logActivity('cmd', msg.data.message);
           break;
@@ -118,8 +122,9 @@ function updateDevicesUI(devices) {
       ? `
         <button class="cmd-btn btn-primary" onclick="triggerCommand('${id}', 'LOCK')">🔒 Lock</button>
         <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'UNLOCK')">🔓 Wake / Unlock</button>
-        <button class="cmd-btn btn-accent" onclick="promptMakeCall('${id}')">📞 Dial Call</button>
+        <button class="cmd-btn btn-accent" onclick="triggerCommand('${id}', 'GET_LOCATION')">📍 Locate GPS</button>
         <button class="cmd-btn btn-danger" onclick="triggerCommand('${id}', 'RING_ALARM')">🚨 Find Phone</button>
+        <button class="cmd-btn btn-accent" onclick="promptMakeCall('${id}')">📞 Dial Call</button>
         <button class="cmd-btn btn-warning" onclick="promptSpeakText('${id}')">🗣️ Speak Text</button>
         <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'TORCH_ON')">🔦 Flashlight On</button>
         <button class="cmd-btn btn-secondary" onclick="triggerCommand('${id}', 'TORCH_OFF')">💡 Flashlight Off</button>
@@ -461,7 +466,54 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// --- 5. TERMINAL LOG ACTIVITY ---
+// --- 5. GPS LOCATION TRACKING & MAP PINPOINT ---
+let currentGoogleMapsUrl = '';
+
+function handleDeviceLocation(data) {
+  const locModal = document.getElementById('locationModal');
+  const locDeviceTitle = document.getElementById('locDeviceTitle');
+  const locLatitude = document.getElementById('locLatitude');
+  const locLongitude = document.getElementById('locLongitude');
+  const locAccuracy = document.getElementById('locAccuracy');
+  const mapIframe = document.getElementById('mapIframe');
+
+  if (locDeviceTitle) locDeviceTitle.textContent = `${data.name || 'Device'} (${data.deviceId || 'phone'})`;
+  if (locLatitude) locLatitude.textContent = data.latitude.toFixed(6);
+  if (locLongitude) locLongitude.textContent = data.longitude.toFixed(6);
+  if (locAccuracy) locAccuracy.textContent = `±${data.accuracy || 10} m`;
+
+  currentGoogleMapsUrl = data.mapsUrl || `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
+
+  // OpenStreetMap embed coordinates
+  const lat = data.latitude;
+  const lng = data.longitude;
+  const delta = 0.004;
+  const embedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${lng - delta}%2C${lat - delta}%2C${lng + delta}%2C${lat + delta}&layer=mapnik&marker=${lat}%2C${lng}`;
+  
+  if (mapIframe) mapIframe.src = embedUrl;
+
+  if (locModal) locModal.classList.add('active');
+
+  logActivity('ok', `📍 [GPS] ${data.name || data.deviceId} at Lat: ${data.latitude.toFixed(5)}, Lng: ${data.longitude.toFixed(5)}`);
+
+  // Voice announcement if requested
+  if (data.voiceAlert) {
+    speakAloud(data.voiceAlert);
+  }
+}
+
+function closeLocationModal() {
+  const locModal = document.getElementById('locationModal');
+  if (locModal) locModal.classList.remove('active');
+}
+
+function openInGoogleMaps() {
+  if (currentGoogleMapsUrl) {
+    window.open(currentGoogleMapsUrl, '_blank');
+  }
+}
+
+// --- 6. TERMINAL LOG ACTIVITY ---
 function logActivity(type, message) {
   const entry = document.createElement('div');
   const timeStr = new Date().toLocaleTimeString();

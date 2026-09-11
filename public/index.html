@@ -170,6 +170,44 @@
     </div>
   </div>
 
+  <!-- GPS LOCATION MODAL OVERLAY -->
+  <div class="call-modal-overlay" id="locationModal">
+    <div class="call-modal-card location-modal-card">
+      <div class="location-header">
+        <div class="loc-pin-orb">📍</div>
+        <div>
+          <span class="call-tag tag-green">LIVE GPS TELEMETRY</span>
+          <h2 id="locDeviceTitle" style="font-size:20px; color:#fff; margin-top:4px;">Neeraj Phone</h2>
+        </div>
+      </div>
+
+      <div class="loc-stats-grid">
+        <div class="loc-stat-box">
+          <span class="stat-label">LATITUDE</span>
+          <span class="stat-val text-green" id="locLatitude">--</span>
+        </div>
+        <div class="loc-stat-box">
+          <span class="stat-label">LONGITUDE</span>
+          <span class="stat-val text-green" id="locLongitude">--</span>
+        </div>
+        <div class="loc-stat-box">
+          <span class="stat-label">ACCURACY</span>
+          <span class="stat-val text-yellow" id="locAccuracy">±-- m</span>
+        </div>
+      </div>
+
+      <!-- Embedded Map Preview -->
+      <div class="map-embed-wrapper" id="mapEmbedContainer">
+        <iframe id="mapIframe" width="100%" height="220" frameborder="0" style="border:0; border-radius:14px;" src="" allowfullscreen></iframe>
+      </div>
+
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-call-decline" onclick="closeLocationModal()">Close</button>
+        <button class="btn-primary" id="btnOpenGoogleMaps" style="padding:12px 20px; font-size:14px; font-weight:700;" onclick="openInGoogleMaps()">🗺️ Open Google Maps</button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

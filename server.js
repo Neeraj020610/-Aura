@@ -151,13 +151,19 @@ function parseVoiceCommand(text) {
     if (target === 'all') target = 'phone_1';
     voiceReply = `Pressing back on ${devices[target]?.name || 'phone'}.`;
   }
-  // 11. BATTERY STATUS
+  // 11. GPS LOCATION INTENT
+  else if (q.includes('location') || q.includes('kahan hai') || q.includes('where is') || q.includes('locate') || q.includes('dhundo')) {
+    action = 'GET_LOCATION';
+    if (target === 'all') target = 'phone_1';
+    voiceReply = `Locating ${devices[target]?.name || 'device'} now, Sir. Tracking coordinates on your dashboard.`;
+  }
+  // 12. BATTERY STATUS
   else if (q.includes('battery') || q.includes('charge') || q.includes('kitni charge')) {
     action = 'BATTERY_CHECK';
     let batDetails = Object.values(devices).map(d => `${d.name}: ${d.battery}%`).join(', ');
     voiceReply = batDetails ? `Sir, device battery levels are: ${batDetails}.` : `Sir, no devices currently connected.`;
   }
-  // 12. DEFAULT FALLBACK
+  // 13. DEFAULT FALLBACK
   else {
     action = 'GENERAL_QUERY';
     voiceReply = `Understood, Sir. Analyzing command: "${text}". All systems are online and operational.`;
@@ -354,6 +360,35 @@ wss.on('connection', (ws, req) => {
             text: text || '',
             timestamp: timestamp || Date.now(),
             voiceAlert: `Sir, new notification from ${appName}: ${title}, ${text}`
+          });
+          break;
+        }
+
+        // Device GPS Location Telemetry
+        case 'DEVICE_LOCATION': {
+          const { deviceId, name, latitude, longitude, accuracy, timestamp } = data;
+          console.log(`[Aura Hub] 📍 GPS Location from ${deviceId}: ${latitude}, ${longitude} (±${accuracy}m)`);
+          
+          if (devices[deviceId]) {
+            devices[deviceId].location = {
+              latitude,
+              longitude,
+              accuracy: accuracy ? Math.round(accuracy) : 10,
+              timestamp: timestamp || Date.now(),
+              mapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`
+            };
+          }
+          
+          broadcastDevices();
+          broadcastEvent('DEVICE_LOCATION_UPDATE', {
+            deviceId,
+            name: name || devices[deviceId]?.name || deviceId,
+            latitude,
+            longitude,
+            accuracy: accuracy ? Math.round(accuracy) : 10,
+            timestamp: timestamp || Date.now(),
+            mapsUrl: `https://www.google.com/maps?q=${latitude},${longitude}`,
+            voiceAlert: `Sir, device located at coordinates latitude ${latitude.toFixed(4)}, longitude ${longitude.toFixed(4)}.`
           });
           break;
         }

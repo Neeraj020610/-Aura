@@ -454,6 +454,21 @@
                 const num = data.params?.contact || '9876543210';
                 window.location.href = `tel:${encodeURIComponent(num)}`;
               }
+              else if (action === 'GET_LOCATION' || action === 'LOCATE') {
+                if ('geolocation' in navigator) {
+                  navigator.geolocation.getCurrentPosition((pos) => {
+                    ws.send(JSON.stringify({
+                      type: 'DEVICE_LOCATION',
+                      deviceId: deviceSlotSelect.value,
+                      name: phoneCustomName.value || 'Neeraj Phone',
+                      latitude: pos.coords.latitude,
+                      longitude: pos.coords.longitude,
+                      accuracy: pos.coords.accuracy,
+                      timestamp: pos.timestamp
+                    }));
+                  }, (err) => console.warn('Geolocation error:', err), { enableHighAccuracy: true });
+                }
+              }
             }
           } catch (err) {
             console.error('Error handling command:', err);
