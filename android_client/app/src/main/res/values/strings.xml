@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Aura Node</string>
+    <string name="accessibility_service_description">Enables Aura Central Hub to perform device screen automation and locking.</string>
+</resources>

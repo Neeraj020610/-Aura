@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AURA // Phone Client Node</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07090e;
+      --panel: #0f172a;
+      --cyan: #00f3ff;
+      --green: #10b981;
+      --danger: #f43f5e;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+    }
+    .node-card {
+      background: var(--panel);
+      border: 1px solid rgba(0, 243, 255, 0.2);
+      border-radius: 24px;
+      padding: 30px 24px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .node-status-orb {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 2px solid var(--green);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+      animation: pulse 2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .node-status-orb svg { width: 36px; height: 36px; color: var(--green); }
+    h1 { font-size: 22px; font-weight: 800; }
+    h1 span { color: var(--cyan); }
+    .device-select-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+    label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+    select, input {
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #fff;
+      padding: 12px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: var(--cyan); }
+    .btn-connect {
+      background: var(--cyan);
+      color: #000;
+      border: none;
+      padding: 14px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .btn-connect:active { transform: scale(0.98); }
+    .status-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--green);
+      background: rgba(16, 185, 129, 0.1);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .alarm-box {
+      display: none;
+      background: var(--danger);
+      color: #fff;
+      padding: 16px;
+      border-radius: 16px;
+      font-weight: 800;
+      animation: flash 0.5s infinite alternate;
+    }
+    @keyframes flash {
+      0% { opacity: 0.8; }
+      100% { opacity: 1; transform: scale(1.02); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="node-card">
+    <div class="node-status-orb" id="statusOrb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+    </div>
+
+    <div>
+      <h1>AURA <span>CLIENT NODE</span></h1>
+      <p style="font-size: 12px; color: var(--muted); margin-top: 4px;">Phone Background Agent Bridge</p>
+    </div>
+
+    <div class="status-badge" id="connStatus">DISCONNECTED</div>
+
+    <div class="device-select-group">
+      <label>Pair this Phone as:</label>
+      <select id="deviceSlotSelect">
+        <option value="phone_1">Android Primary (Phone 1)</option>
+        <option value="phone_2">Android Secondary (Phone 2)</option>
+      </select>
+    </div>
+
+    <div class="device-select-group">
+      <label>Custom Phone Name:</label>
+      <input type="text" id="phoneCustomName" value="My Android Device">
+    </div>
+
+    <button class="btn-connect" id="btnToggleConnect" onclick="togglePhoneConnection()">PAIR & CONNECT PHONE</button>
+
+    <div class="alarm-box" id="alarmBox">
+      🚨 FIND MY PHONE // ALARM RINGING!
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let isConnected = false;
+    let telemetryTimer = null;
+    let audioCtx = null;
+
+    const connStatus = document.getElementById('connStatus');
+    const btnToggleConnect = document.getElementById('btnToggleConnect');
+    const deviceSlotSelect = document.getElementById('deviceSlotSelect');
+    const phoneCustomName = document.getElementById('phoneCustomName');
+    const alarmBox = document.getElementById('alarmBox');
+
+    function playLoudAlarm() {
+      alarmBox.style.display = 'block';
+      
+      // Vibrate phone if supported
+      if ('vibrate' in navigator) {
+        navigator.vibrate([500, 250, 500, 250, 500, 250, 500]);
+      }
+
+      // Play beep sound via Web Audio
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        setTimeout(() => {
+          osc.stop();
+          alarmBox.style.display = 'none';
+        }, 4000);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    let batteryManager = null;
+
+    async function initBatteryMonitoring() {
+      if ('getBattery' in navigator) {
+        try {
+          batteryManager = await navigator.getBattery();
+          
+          // Immediate update on charging plug/unplug
+          batteryManager.addEventListener('chargingchange', () => {
+            console.log('Charging changed:', batteryManager.charging);
+            sendTelemetry();
+          });
+          
+          batteryManager.addEventListener('levelchange', () => {
+            sendTelemetry();
+          });
+        } catch (e) {
+          console.warn('Battery API error:', e);
+        }
+      }
+    }
+
+    async function getBatteryInfo() {
+      if (batteryManager) {
+        return {
+          battery: Math.round(batteryManager.level * 100),
+          isCharging: batteryManager.charging
+        };
+      }
+      if ('getBattery' in navigator) {
+        try {
+          const b = await navigator.getBattery();
+          return {
+            battery: Math.round(b.level * 100),
+            isCharging: b.charging
+          };
+        } catch (e) {}
+      }
+      return { battery: 20, isCharging: false };
+    }
+
+    async function sendTelemetry() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const bInfo = await getBatteryInfo();
+      ws.send(JSON.stringify({
+        type: 'TELEMETRY',
+        deviceId: deviceSlotSelect.value,
+        name: phoneCustomName.value || 'Neeraj Phone',
+        battery: bInfo.battery,
+        isCharging: bInfo.isCharging,
+        screen: 'ON'
+      }));
+    }
+
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Screen WakeLock active!');
+        }
+      } catch (err) {
+        console.warn('WakeLock error:', err);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initBatteryMonitoring();
+      requestWakeLock();
+      
+      // Auto re-request wakelock and reconnect when tab becomes visible again
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          requestWakeLock();
+          if (!isConnected) togglePhoneConnection();
+        }
+      });
+    });
+
+    function togglePhoneConnection() {
+      if (isConnected) {
+        if (ws) ws.close();
+        return;
+      }
+      initBatteryMonitoring();
+
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}`;
+
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        isConnected = true;
+        connStatus.textContent = 'CONNECTED & PAIRED';
+        connStatus.style.color = '#10b981';
+        btnToggleConnect.textContent = 'DISCONNECT';
+        btnToggleConnect.style.background = '#f43f5e';
+        btnToggleConnect.style.color = '#fff';
+
+        // Register phone
+        ws.send(JSON.stringify({
+          type: 'REGISTER',
+          deviceId: deviceSlotSelect.value,
+          name: phoneCustomName.value || 'Android Phone',
+          deviceType: 'mobile'
+        }));
+
+        sendTelemetry();
+        telemetryTimer = setInterval(sendTelemetry, 5000);
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          console.log('[PHONE CLIENT] Received Command:', data);
+
+          if (data.type === 'COMMAND') {
+            const action = data.action;
+
+            if (action === 'RING_ALARM') {
+              playLoudAlarm();
+            } 
+            else if (action === 'LOCK') {
+              showLockScreenOverlay();
+            } 
+            else if (action === 'SCREEN_OFF') {
+              showScreenOffOverlay();
+            } 
+            else if (action === 'UNLOCK') {
+              hideOverlays();
+            } 
+            else if (action === 'CALL') {
+              const num = data.params?.contact || '9876543210';
+              window.location.href = `tel:${encodeURIComponent(num)}`;
+            }
+          }
+        } catch (err) {
+          console.error('Error in phone onmessage:', err);
+        }
+      };
+
+      ws.onclose = () => {
+        isConnected = false;
+        clearInterval(telemetryTimer);
+        connStatus.textContent = 'DISCONNECTED';
+        connStatus.style.color = '#f43f5e';
+        btnToggleConnect.textContent = 'PAIR & CONNECT PHONE';
+        btnToggleConnect.style.background = '#00f3ff';
+        btnToggleConnect.style.color = '#000';
+      };
+    }
+
+    // Overlays for Lock and Screen Off
+    function showLockScreenOverlay() {
+      let lockDiv = document.getElementById('phoneLockOverlay');
+      if (!lockDiv) {
+        lockDiv = document.createElement('div');
+        lockDiv.id = 'phoneLockOverlay';
+        lockDiv.style.cssText = 'position:fixed;inset:0;background:#000;color:#f43f5e;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;text-align:center;padding:20px;';
+        lockDiv.innerHTML = `
+          <div style="font-size:70px;margin-bottom:20px;">🔒</div>
+          <h1 style="font-size:28px;color:#fff;margin-bottom:10px;">PHONE LOCKED</h1>
+          <p style="color:#94a3b8;font-size:14px;">Locked remotely by Aura Master Hub</p>
+          <button onclick="hideOverlays()" style="margin-top:40px;background:#10b981;color:#000;border:none;padding:12px 28px;border-radius:12px;font-weight:800;font-size:16px;">TAP TO UNLOCK</button>
+        `;
+        document.body.appendChild(lockDiv);
+      }
+      lockDiv.style.display = 'flex';
+      if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+    }
+
+    function showScreenOffOverlay() {
+      let offDiv = document.getElementById('phoneScreenOffOverlay');
+      if (!offDiv) {
+        offDiv = document.createElement('div');
+        offDiv.id = 'phoneScreenOffOverlay';
+        offDiv.style.cssText = 'position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:99999;';
+        offDiv.innerHTML = `
+          <p style="color:#334155;font-size:12px;cursor:pointer;" onclick="hideOverlays()">Screen Off (Tap to wake)</p>
+        `;
+        document.body.appendChild(offDiv);
+      }
+      offDiv.style.display = 'flex';
+    }
+
+    function hideOverlays() {
+      const lockDiv = document.getElementById('phoneLockOverlay');
+      if (lockDiv) lockDiv.style.display = 'none';
+      const offDiv = document.getElementById('phoneScreenOffOverlay');
+      if (offDiv) offDiv.style.display = 'none';
+      if ('vibrate' in navigator) navigator.vibrate(100);
+    }
+  </script>
+</body>
+</html>

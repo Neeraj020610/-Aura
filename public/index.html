@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA // Central Device Command & Voice Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient background glow effects -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+  <div class="ambient-glow glow-3"></div>
+
+  <div class="app-container">
+    <!-- TOP HEADER -->
+    <header class="master-header">
+      <div class="brand-section">
+        <div class="logo-orb">
+          <div class="inner-core"></div>
+        </div>
+        <div class="brand-titles">
+          <h1>AURA <span>HUB</span></h1>
+          <p class="subtitle">Unified Multi-Device Neural Orchestrator</p>
+        </div>
+      </div>
+
+      <div class="network-badge" id="networkBadge">
+        <div class="pulse-indicator"></div>
+        <div class="network-info">
+          <span class="net-status">SYSTEM ONLINE</span>
+          <span class="net-ip" id="serverIpAddress">ws://localhost:3000</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN GRID LAYOUT -->
+    <main class="dashboard-grid">
+      
+      <!-- LEFT / TOP: SIRI / JARVIS VOICE CONTROL HERO -->
+      <section class="voice-hero-card">
+        <div class="card-header">
+          <div class="badge-tag">AI VOICE CORE</div>
+          <span class="voice-mode" id="voiceStatusLabel">Voice Assistant Ready</span>
+        </div>
+
+        <div class="orb-container">
+          <div class="siri-orb" id="micButton">
+            <div class="orb-ring ring-1"></div>
+            <div class="orb-ring ring-2"></div>
+            <div class="orb-ring ring-3"></div>
+            <div class="orb-center">
+              <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </div>
+          </div>
+          <p class="orb-instruction">Tap Orb or Speak Command</p>
+        </div>
+
+        <!-- SPEECH INTERACTION DISPLAY -->
+        <div class="dialogue-box">
+          <div class="query-line" id="userSpeechTranscript">
+            <span class="label">YOU:</span> <span class="text" id="userTextDisplay">"Say 'Lock PC' or 'Call Rahul from Phone 1'..."</span>
+          </div>
+          <div class="response-line" id="assistantSpeechResponse">
+            <span class="label">AURA:</span> <span class="text" id="assistantTextDisplay">"I am listening, Boss. All 4 devices are connected and ready."</span>
+          </div>
+        </div>
+
+        <!-- QUICK VOICE ACTION CHIPS -->
+        <div class="quick-chips-wrapper">
+          <span class="chip-label">Quick Commands:</span>
+          <div class="chips-list">
+            <button class="voice-chip" data-command="Lock PC">🔒 Lock PC</button>
+            <button class="voice-chip" data-command="Call Rohan from Phone 1">📞 Call Rohan (Phone 1)</button>
+            <button class="voice-chip" data-command="Lock Phone 2">📱 Lock Phone 2</button>
+            <button class="voice-chip" data-command="Screen Off Phone 1">🌑 Screen Off Phone 1</button>
+            <button class="voice-chip" data-command="Ring Phone 1">🚨 Find Phone 1</button>
+            <button class="voice-chip" data-command="Battery Status">⚡ Check All Battery</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT / DEVICES TELEMETRY & CONTROLS GRID -->
+      <section class="devices-section">
+        <div class="section-title-bar">
+          <h2 id="fleetTitle">CONNECTED FLEET <span id="fleetCount">(0 Live Devices)</span></h2>
+          <button class="btn-ghost" id="refreshFleetBtn">Sync Telemetry</button>
+        </div>
+
+        <!-- DYNAMIC FLEET CONTAINER (Rendered purely from real connected clients) -->
+        <div class="device-cards-grid" id="dynamicDeviceGrid">
+          <div class="no-devices-box">
+            <div class="empty-icon">📡</div>
+            <h3>Waiting for Real Devices to Connect...</h3>
+            <p>Open <code>https://83ba789fe18674.lhr.life/phone.html</code> on your phone or run <code>python aura_pc_agent.py</code> on your PC to pair!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOTTOM: REAL-TIME SYSTEM TELEMETRY LOG -->
+      <section class="log-section">
+        <div class="log-header">
+          <div class="log-title">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span>AURA EVENT BUS // REAL-TIME ACTIVITY STREAM</span>
+          </div>
+          <button class="btn-clear-log" onclick="clearLogs()">Clear Log</button>
+        </div>
+        <div class="log-body" id="eventLogContainer">
+          <div class="log-entry sys">[SYSTEM] Aura Neural Orchestrator v1.0 initialized.</div>
+          <div class="log-entry ok">[READY] All 4 client channels active on WebSocket.</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- INCOMING CALL MODAL OVERLAY -->
+  <div class="call-modal-overlay" id="incomingCallModal">
+    <div class="call-modal-card">
+      <div class="call-avatar-pulse">
+        <div class="avatar-ring"></div>
+        <div class="avatar-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+        </div>
+      </div>
+      <span class="call-tag">INCOMING CALL ALERT</span>
+      <h2 id="modalCallerName">Papa</h2>
+      <p id="modalCallerNumber">+91 98765 43210</p>
+      <div class="call-target-badge" id="modalTargetDevice">Ringing on Android Phone 1</div>
+
+      <div class="modal-actions">
+        <button class="btn-call-decline" onclick="dismissCallModal()">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M12 10.586l4.95-4.95 1.414 1.414-4.95 4.95 4.95 4.95-1.414 1.414-4.95-4.95-4.95 4.95-1.414-1.414 4.95-4.95-4.95-4.95L7.05 5.636z"/></svg>
+          Reject / Cut
+        </button>
+        <button class="btn-call-accept" onclick="acceptCallModal()">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+          Answer (Speaker)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

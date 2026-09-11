@@ -1,0 +1,11 @@
+node_modules/
+.system_generated/
+*.log
+.DS_Store
+.gradle/
+build/
+android_client/app/build/
+android_client/build/
+android_client/.gradle/
+local.properties
+.idea/
